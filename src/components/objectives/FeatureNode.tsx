@@ -1,0 +1,117 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { OkrItem } from '@/types';
+import { TYPE_COLORS, TYPE_LABELS } from '@/lib/constants';
+import { Badge } from '@/components/ui/badge';
+import { ChevronRight, ChevronDown } from 'lucide-react';
+import { isOverdue } from '@/lib/dateUtils';
+import { nextStatus } from '@/lib/statusUtils';
+import { useAuth } from '@/context/AuthContext';
+
+const TYPE_BORDER: Record<string, string> = {
+  Feature: 'border-pink-400',
+  UserCapability: 'border-purple-400',
+  Adoption: 'border-green-500',
+  Impact: 'border-rose-400',
+};
+
+const STATUS_DOT: Record<string, string> = {
+  'Chưa bắt đầu': 'bg-[#5f6368]',
+  'Đang triển khai': 'bg-[#fbbc04]',
+  'Hoàn thành': 'bg-[#34a853]',
+};
+
+interface Props {
+  item: OkrItem;
+  depth?: number;
+  onItemClick: (id: string) => void;
+}
+
+export function FeatureNode({ item, depth = 0, onItemClick }: Props) {
+  const [expanded, setExpanded] = useState(false);
+  const router = useRouter();
+  const { isAdmin } = useAuth();
+  const hasChildren = item.children && item.children.length > 0;
+  const borderColor = TYPE_BORDER[item.type] || 'border-gray-300';
+  const overdue = isOverdue(item.endDate, item.status);
+
+  return (
+    <div>
+      <div
+        className={`flex items-center gap-2 py-2.5 hover:bg-[#f8f9fa] border-b border-[#f1f3f4] text-sm border-l-[3px] ${borderColor}`}
+        style={{ paddingLeft: `${depth * 16 + 20}px` }}
+      >
+        <button
+          className="text-[#9aa0a6] w-4 flex-shrink-0"
+          onClick={() => hasChildren && setExpanded((e) => !e)}
+        >
+          {hasChildren ? (
+            expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />
+          ) : (
+            <span className="block w-3 h-px bg-[#e0e0e0]" />
+          )}
+        </button>
+
+        <Badge className={`text-[9px] px-1.5 py-0 flex-shrink-0 ${TYPE_COLORS[item.type]}`}>
+          {TYPE_LABELS[item.type]}
+        </Badge>
+        {overdue && <span className="w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-red-200 flex-shrink-0" title="Trễ hạn" />}
+
+        {/* Clickable title */}
+        <button
+          className="flex-1 text-[#202124] text-left hover:text-blue-600 cursor-pointer line-clamp-1"
+          onClick={() => onItemClick(item.id)}
+        >
+          {item.title}
+        </button>
+
+        <div className="flex items-center gap-3 flex-shrink-0 pr-3">
+          {item.project && (
+            <span className="text-[10px] text-[#9aa0a6]">{item.project}</span>
+          )}
+          {item.owner && (
+            <span className="text-[10px] text-[#9aa0a6]">{item.owner}</span>
+          )}
+          {isAdmin ? (
+            <button
+              className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STATUS_DOT[item.status] || 'bg-[#5f6368]'} hover:scale-125 transition-transform cursor-pointer`}
+              title={`${item.status} → nhấn để đổi`}
+              onClick={async (e) => {
+                e.stopPropagation();
+                await fetch(`/api/items/${item.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ status: nextStatus(item.status) }),
+                });
+                router.refresh();
+              }}
+            />
+          ) : (
+            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STATUS_DOT[item.status] || 'bg-[#5f6368]'}`} title={item.status} />
+          )}
+          <div className="flex items-center gap-1 w-20">
+            <div className="flex-1 h-1 bg-[#e8f0fe] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#1a73e8] rounded-full"
+                style={{ width: `${Math.round(item.progressPct)}%` }}
+              />
+            </div>
+            <span className="text-[10px] text-[#5f6368] w-6 text-right">
+              {Math.round(item.progressPct)}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {expanded && hasChildren && (
+        <div>
+          {item.children!.map((child) => (
+            <FeatureNode key={child.id} item={child} depth={depth + 1} onItemClick={onItemClick} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

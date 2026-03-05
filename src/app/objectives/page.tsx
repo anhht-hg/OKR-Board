@@ -1,0 +1,54 @@
+import { Header } from '@/components/layout/Header';
+import { ObjectiveTree } from '@/components/objectives/ObjectiveTree';
+import { CreateItemButton } from '@/components/objectives/CreateItemButton';
+import prisma from '@/lib/prisma';
+
+async function getObjectives() {
+  return prisma.okrItem.findMany({
+    where: { type: 'Objective' },
+    orderBy: { sortOrder: 'asc' },
+    include: {
+      children: {
+        orderBy: { sortOrder: 'asc' },
+        include: {
+          children: {
+            orderBy: { sortOrder: 'asc' },
+            include: {
+              children: {
+                orderBy: { sortOrder: 'asc' },
+                include: {
+                  children: { orderBy: { sortOrder: 'asc' } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export default async function ObjectivesPage() {
+  const objectives = await getObjectives();
+
+  return (
+    <>
+      <Header title="OKR Tree" />
+      <main className="pt-14 bg-[#f8f9fa] min-h-screen">
+        <div className="max-w-[1600px] mx-auto px-8 py-10">
+          <div className="mb-8 flex items-start justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">OKR Tree View</h1>
+              <p className="text-sm text-gray-500 mt-1">
+                Toàn bộ cây Objectives → Success Factors → Key Results → Features
+              </p>
+            </div>
+            <CreateItemButton />
+          </div>
+          <ObjectiveTree objectives={objectives as any} />
+        </div>
+      </main>
+    </>
+  );
+}
+export const dynamic = "force-dynamic";

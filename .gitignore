@@ -30,8 +30,18 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — never commit credentials
 .env*
+# keep the example template
+!.env.example
+
+# database binary — never commit
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+# but keep the SQL data dump for server restore
+!prisma/seed/data.sql
 
 # vercel
 .vercel
@@ -39,3 +49,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma

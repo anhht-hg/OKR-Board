@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model OkrItem {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Identity
+  code      String?
+  title     String
+  type      String
+  sortOrder Int     @default(0)
+
+  // Execution fields (File 1, all editable)
+  project     String?
+  status      String    @default("Chưa bắt đầu")
+  startDate   DateTime?
+  endDate     DateTime?
+  owner       String?
+  stakeholder String?
+  chotFlag    String?
+  isOptional  Boolean   @default(false)
+
+  // Strategic fields (File 2, read-only in UI)
+  strategicPillar    String?
+  deadline           String?
+  pic                String?
+  scope              String?
+  description        String?
+  successMetric      String?
+  targetValue        String?
+  measureFormula     String?
+  corporateKRLinkage String?
+  notes              String?
+
+  // Computed
+  progressPct Float @default(0)
+
+  // Self-referencing hierarchy
+  parentId String?
+  parent   OkrItem?  @relation("ItemTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children OkrItem[] @relation("ItemTree")
+}
