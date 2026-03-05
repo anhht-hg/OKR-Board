@@ -12,6 +12,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { DashboardStats } from '@/types';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
 interface Props {
   stats: DashboardStats;
@@ -60,8 +61,18 @@ export function ObjectiveProgressChart({ stats }: Props) {
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 h-full">
       <div className="flex items-start justify-between mb-1">
         <div>
-          <h3 className="text-base font-semibold text-gray-800">Tiến độ theo Objectives</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Mỗi Objective đang ở đâu so với mục tiêu?</p>
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-base font-semibold text-gray-800">Tiến độ theo mục tiêu</h3>
+            <InfoTooltip content={
+              <div className="space-y-1.5">
+                <p className="font-semibold text-white">Tiến độ theo mục tiêu</p>
+                <p>Mỗi cột là một mục tiêu. Chiều cao cột = tiến độ được tính theo công thức:</p>
+                <p className="bg-gray-800 rounded px-2 py-1 font-mono text-[10px]">50% × tb.(YTTC/KCTK) + 50% × tb.(tính năng)</p>
+                <p>Màu sắc: <span className="text-emerald-400">xanh ≥70%</span> · <span className="text-blue-400">xanh dương 40-70%</span> · <span className="text-orange-400">cam &lt;40%</span></p>
+              </div>
+            } side="bottom" />
+          </div>
+          <p className="text-xs text-gray-400 mt-0.5">Mỗi mục tiêu đang ở đâu so với kế hoạch?</p>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-gray-400 mt-0.5">
           <span className="flex items-center gap-1.5">

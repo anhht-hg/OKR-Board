@@ -1,5 +1,6 @@
 import { Header } from '@/components/layout/Header';
 import { OkrModule } from '@/components/dashboard/OkrModule';
+import { ProgressLogicExplainer } from '@/components/dashboard/ProgressLogicExplainer';
 import prisma from '@/lib/prisma';
 
 async function getData() {
@@ -70,6 +71,19 @@ async function getData() {
     statusBreakdown: [],
     roadmapItems: [],
     progressTrend: { series: [], points: [] },
+    featureDelivery: {
+      totalFeatures: 0, totalUC: 0,
+      completedFeatures: 0, inProgressFeatures: 0, notStartedFeatures: 0,
+      completedUC: 0, inProgressUC: 0,
+      pctFeatures: 0, pctUC: 0, avgDeliveryPct: 0,
+    },
+    businessOutcomes: {
+      totalSF: 0, totalKR: 0, totalOutcomes: 0, totalAdoption: 0, totalImpact: 0,
+      completedSF: 0, completedKR: 0, completedOutcomes: 0, completedAdoption: 0, completedImpact: 0,
+      pctSF: 0, pctKR: 0, pctOutcomes: 0, avgOutcomePct: 0, avgAdoptionPct: 0, avgImpactPct: 0,
+    },
+    deliveryByObjective: [],
+    rawItems: [],
   };
 }
 
@@ -85,6 +99,9 @@ export default async function OkrPage() {
             <p className="text-sm text-gray-500 mt-1">Công nghệ và vận hành · Theo dõi tiến độ Objectives</p>
           </div>
           <OkrModule stats={data} />
+          <div className="mt-8">
+            <ProgressLogicExplainer />
+          </div>
         </div>
       </main>
     </>

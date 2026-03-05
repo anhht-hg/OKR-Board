@@ -5,6 +5,7 @@ import {
   Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { DashboardStats } from '@/types';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
 interface Props { stats: DashboardStats }
 
@@ -84,6 +85,14 @@ export function ProgressTrendChart({ stats }: Props) {
             <span className="text-[10px] bg-amber-100 text-amber-600 font-semibold px-1.5 py-0.5 rounded">
               Ước tính
             </span>
+            <InfoTooltip content={
+              <div className="space-y-1.5">
+                <p className="font-semibold text-white">Xu hướng tiến độ — Ước tính</p>
+                <p>Đây là đường tăng trưởng <strong>mô phỏng</strong>, không phải dữ liệu lịch sử thực tế.</p>
+                <p>Cách tính: giả sử tiến độ tăng tuyến tính từ ngày bắt đầu đến hôm nay, theo công thức <span className="font-mono text-[10px] bg-gray-800 px-1 rounded">tiến_độ × (t/tổng)^1.4</span></p>
+                <p className="text-gray-400 text-[10px]">Để có dữ liệu thực: cần lưu lịch sử tiến độ theo ngày.</p>
+              </div>
+            } />
           </div>
           <p className="text-xs text-gray-400 mt-0.5">
             Objective nào đang tăng nhanh? Objective nào đang chậm lại?

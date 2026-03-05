@@ -38,9 +38,9 @@ export default async function ObjectivesPage() {
         <div className="max-w-[1600px] mx-auto px-8 py-10">
           <div className="mb-8 flex items-start justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">OKR Tree View</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Cây OKR</h1>
               <p className="text-sm text-gray-500 mt-1">
-                Toàn bộ cây Objectives → Success Factors → Key Results → Features
+                Mục tiêu → Yếu tố thành công → Kết quả then chốt → Tính năng
               </p>
             </div>
             <CreateItemButton />

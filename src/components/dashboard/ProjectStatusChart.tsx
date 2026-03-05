@@ -2,6 +2,7 @@
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { DashboardStats } from '@/types';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
 const STATUS_CONFIG = [
   { key: 'Hoàn thành', color: '#10b981', label: 'Hoàn thành' },
@@ -47,7 +48,17 @@ export function ProjectStatusChart({ stats }: Props) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 h-full flex flex-col">
       <div className="mb-1">
-        <h3 className="text-base font-semibold text-gray-800">Phân bổ trạng thái</h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-base font-semibold text-gray-800">Phân bổ trạng thái</h3>
+          <InfoTooltip content={
+            <div className="space-y-1.5">
+              <p className="font-semibold text-white">Phân bổ trạng thái</p>
+              <p>Biểu đồ donut cho thấy tỷ lệ 3 trạng thái trên <strong>toàn bộ 189 hạng mục</strong> (tất cả loại).</p>
+              <p>Trạng thái được set thủ công bởi admin — <em>không</em> tự động tính từ con.</p>
+              <p className="text-gray-400 text-[10px]">Hoàn thành · Đang triển khai · Chưa bắt đầu</p>
+            </div>
+          } side="bottom" />
+        </div>
         <p className="text-xs text-gray-400 mt-0.5">Tỷ lệ hoàn thành toàn bộ hạng mục</p>
       </div>
 

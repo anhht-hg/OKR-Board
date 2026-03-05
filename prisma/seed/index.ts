@@ -16,6 +16,44 @@ const STATUS_WEIGHT: Record<string, number> = {
   'Chưa bắt đầu': 0,
 };
 
+function calcProgress(
+  item: { type: string; status: string },
+  children: { type: string; progressPct: number }[],
+  outcomeGrandchildren?: { progressPct: number }[],
+  featureDescendants?: { progressPct: number }[]
+): number {
+  const avg = (arr: { progressPct: number }[]) =>
+    arr.length > 0 ? arr.reduce((s, c) => s + c.progressPct, 0) / arr.length : 0;
+
+  if (children.length === 0) return STATUS_WEIGHT[item.status] ?? 0;
+
+  if (item.type === 'Feature') {
+    const uc = children.filter(c => c.type === 'UserCapability');
+    return uc.length > 0 ? Math.round(avg(uc)) : STATUS_WEIGHT[item.status] ?? 0;
+  }
+
+  if (item.type === 'KeyResult') {
+    const features = children.filter(c => c.type === 'Feature');
+    const deliveryScore = avg(features);
+    if (outcomeGrandchildren && outcomeGrandchildren.length > 0) {
+      return Math.round(deliveryScore * 0.6 + avg(outcomeGrandchildren) * 0.4);
+    }
+    return Math.round(deliveryScore);
+  }
+
+  if (item.type === 'Objective') {
+    // Treat both SF and direct KR children as strategic signals
+    const strategic = children.filter(c => c.type === 'SuccessFactor' || c.type === 'KeyResult');
+    const strategicScore = strategic.length > 0 ? avg(strategic) : STATUS_WEIGHT[item.status] ?? 0;
+    if (featureDescendants && featureDescendants.length > 0) {
+      return Math.round(strategicScore * 0.5 + avg(featureDescendants) * 0.5);
+    }
+    return Math.round(strategicScore);
+  }
+
+  return Math.round(avg(children));
+}
+
 async function recalculateAllProgress() {
   const typeOrder = ['UserCapability', 'Adoption', 'Impact', 'Feature', 'KeyResult', 'SuccessFactor', 'Objective'];
 
@@ -26,13 +64,38 @@ async function recalculateAllProgress() {
     });
 
     for (const item of items) {
-      let progress: number;
-      if (item.children.length === 0) {
-        progress = STATUS_WEIGHT[item.status] ?? 0;
-      } else {
-        const avg = item.children.reduce((s, c) => s + c.progressPct, 0) / item.children.length;
-        progress = Math.round(avg);
+      let outcomeGrandchildren: { progressPct: number }[] | undefined;
+      let featureDescendants: { progressPct: number }[] | undefined;
+
+      if (type === 'KeyResult') {
+        const featureIds = item.children.filter(c => c.type === 'Feature').map(c => c.id);
+        if (featureIds.length > 0) {
+          outcomeGrandchildren = await prisma.okrItem.findMany({
+            where: { parentId: { in: featureIds }, type: { in: ['Adoption', 'Impact'] } },
+            select: { progressPct: true },
+          });
+        }
       }
+
+      if (type === 'Objective') {
+        const sfIds = item.children.filter(c => c.type === 'SuccessFactor').map(c => c.id);
+        const directKrIds = item.children.filter(c => c.type === 'KeyResult').map(c => c.id);
+        const sfKrItems = sfIds.length > 0
+          ? await prisma.okrItem.findMany({
+              where: { parentId: { in: sfIds }, type: 'KeyResult' },
+              select: { id: true },
+            })
+          : [];
+        const allKrIds = [...sfKrItems.map(k => k.id), ...directKrIds];
+        if (allKrIds.length > 0) {
+          featureDescendants = await prisma.okrItem.findMany({
+            where: { parentId: { in: allKrIds }, type: 'Feature' },
+            select: { progressPct: true },
+          });
+        }
+      }
+
+      const progress = calcProgress(item, item.children, outcomeGrandchildren, featureDescendants);
       await prisma.okrItem.update({
         where: { id: item.id },
         data: { progressPct: progress },

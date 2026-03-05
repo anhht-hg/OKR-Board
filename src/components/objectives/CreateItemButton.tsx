@@ -9,13 +9,13 @@ import { CreateItemDrawer } from '@/components/dashboard/CreateItemDrawer';
 import { useAuth } from '@/context/AuthContext';
 
 const CREATE_TYPES = [
-  { value: 'Objective',      label: 'Objective',       bg: 'bg-blue-100',   text: 'text-blue-600',   icon: Target },
-  { value: 'SuccessFactor',  label: 'Success Factor',  bg: 'bg-teal-100',   text: 'text-teal-600',   icon: Layers },
-  { value: 'KeyResult',      label: 'Key Result',      bg: 'bg-slate-100',  text: 'text-slate-600',  icon: Calculator },
-  { value: 'Feature',        label: 'Feature',         bg: 'bg-pink-100',   text: 'text-pink-600',   icon: Briefcase },
-  { value: 'UserCapability', label: 'User Capability', bg: 'bg-purple-100', text: 'text-purple-600', icon: Users },
-  { value: 'Adoption',       label: 'Adoption',        bg: 'bg-green-100',  text: 'text-green-600',  icon: TrendingUp },
-  { value: 'Impact',         label: 'Impact',          bg: 'bg-rose-100',   text: 'text-rose-600',   icon: Zap },
+  { value: 'Objective',      label: 'Mục tiêu',              bg: 'bg-blue-100',   text: 'text-blue-600',   icon: Target },
+  { value: 'SuccessFactor',  label: 'Yếu tố thành công',     bg: 'bg-teal-100',   text: 'text-teal-600',   icon: Layers },
+  { value: 'KeyResult',      label: 'Kết quả then chốt',     bg: 'bg-slate-100',  text: 'text-slate-600',  icon: Calculator },
+  { value: 'Feature',        label: 'Tính năng',             bg: 'bg-pink-100',   text: 'text-pink-600',   icon: Briefcase },
+  { value: 'UserCapability', label: 'Năng lực người dùng',   bg: 'bg-purple-100', text: 'text-purple-600', icon: Users },
+  { value: 'Adoption',       label: 'Mức độ tiếp nhận',      bg: 'bg-green-100',  text: 'text-green-600',  icon: TrendingUp },
+  { value: 'Impact',         label: 'Tác động',              bg: 'bg-rose-100',   text: 'text-rose-600',   icon: Zap },
 ];
 
 export function CreateItemButton() {
@@ -43,7 +43,7 @@ export function CreateItemButton() {
             className="h-8 px-3 text-[11px] font-bold uppercase tracking-tight border-gray-200 text-gray-600 hover:bg-gray-50"
           >
             <Plus className="mr-1 h-3.5 w-3.5" />
-            Create
+            Tạo mới
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" sideOffset={4} className="w-52 p-1">

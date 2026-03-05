@@ -73,6 +73,61 @@ export interface RoadmapItem {
   endDate: string | null;
 }
 
+export interface FeatureDeliveryStats {
+  totalFeatures: number;
+  totalUC: number;
+  completedFeatures: number;
+  inProgressFeatures: number;
+  notStartedFeatures: number;
+  completedUC: number;
+  inProgressUC: number;
+  pctFeatures: number;
+  pctUC: number;
+  avgDeliveryPct: number;
+}
+
+export interface BusinessOutcomesStats {
+  totalSF: number;
+  totalKR: number;
+  totalOutcomes: number;
+  totalAdoption: number;
+  totalImpact: number;
+  completedSF: number;
+  completedKR: number;
+  completedOutcomes: number;
+  completedAdoption: number;
+  completedImpact: number;
+  pctSF: number;
+  pctKR: number;
+  pctOutcomes: number;
+  avgOutcomePct: number;
+  avgAdoptionPct: number;
+  avgImpactPct: number;
+}
+
+export interface ObjectiveTrackBreakdown {
+  id: string;
+  code: string | null;
+  title: string;
+  progressPct: number;
+  deliveryPct: number;
+  outcomePct: number;
+}
+
+export interface RawItem {
+  id: string;
+  title: string;
+  code: string | null;
+  type: string;
+  status: string;
+  progressPct: number;
+  project: string | null;
+  owner: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  parentId: string | null;
+}
+
 export interface DashboardStats {
   totalItems: number;
   totalObjectives: number;
@@ -105,4 +160,8 @@ export interface DashboardStats {
     series: Array<{ id: string; code: string | null; title: string; color: string; currentPct: number }>;
     points: Array<{ week: string; date: string; [key: string]: number | string }>;
   };
+  featureDelivery: FeatureDeliveryStats;
+  businessOutcomes: BusinessOutcomesStats;
+  deliveryByObjective: ObjectiveTrackBreakdown[];
+  rawItems: RawItem[];
 }

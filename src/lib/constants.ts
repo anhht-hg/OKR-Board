@@ -21,13 +21,13 @@ export const TYPE_COLORS: Record<string, string> = {
 };
 
 export const TYPE_LABELS: Record<string, string> = {
-  Objective: 'Objectives',
-  SuccessFactor: 'Success Factor',
-  KeyResult: 'Key Result',
-  Feature: 'Feature',
-  UserCapability: 'User Capability',
-  Adoption: 'Adoption',
-  Impact: 'Impact',
+  Objective: 'Mục tiêu',
+  SuccessFactor: 'Yếu tố thành công',
+  KeyResult: 'Kết quả then chốt',
+  Feature: 'Tính năng',
+  UserCapability: 'Năng lực người dùng',
+  Adoption: 'Mức độ tiếp nhận',
+  Impact: 'Tác động',
 };
 
 export const PROJECTS = [

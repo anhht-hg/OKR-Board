@@ -2,6 +2,7 @@
 
 import { DashboardStats } from '@/types';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
 interface Props {
   stats: DashboardStats;
@@ -38,7 +39,17 @@ export function ProjectHealthGrid({ stats }: Props) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
       <div className="mb-6">
-        <h3 className="text-base font-semibold text-gray-800">Sức khỏe dự án</h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-base font-semibold text-gray-800">Sức khỏe dự án</h3>
+          <InfoTooltip content={
+            <div className="space-y-1.5">
+              <p className="font-semibold text-white">Sức khỏe dự án</p>
+              <p>Mỗi thẻ = một dự án. Tiến độ % = trung bình tiến độ của tất cả hạng mục thuộc dự án đó.</p>
+              <p>Nhãn sức khỏe: <span className="text-emerald-400">Tốt ≥70%</span> · <span className="text-blue-400">Trung bình 40-70%</span> · <span className="text-orange-400">Cần chú ý &lt;40%</span></p>
+              <p className="text-gray-400 text-[10px]">Một hạng mục có thể thuộc nhiều dự án cùng lúc.</p>
+            </div>
+          } />
+        </div>
         <p className="text-xs text-gray-400 mt-0.5">Tiến độ và trạng thái từng dự án</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">

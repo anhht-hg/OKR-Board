@@ -8,6 +8,7 @@ import { TYPE_COLORS, TYPE_LABELS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 
 import { useAuth } from '@/context/AuthContext';
+import { GlossaryButton } from '@/components/ui/GlossaryModal';
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -74,6 +75,7 @@ export function Header({ title }: { title: string }) {
         )}
       </div>
       <div className="flex-1" />
+      <GlossaryButton />
       <div ref={wrapRef} className="relative w-80">
         <div
           className={`flex items-center rounded-xl px-3.5 py-2 gap-2.5 transition-all ${

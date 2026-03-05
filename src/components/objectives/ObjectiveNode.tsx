@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OkrItem } from '@/types';
-import { TYPE_COLORS } from '@/lib/constants';
+import { TYPE_COLORS, TYPE_LABELS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { KeyResultNode } from './KeyResultNode';
@@ -67,7 +67,7 @@ function SuccessFactorNode({ item, onItemClick }: { item: OkrItem; onItemClick: 
           ) : null}
         </button>
         <Badge className={`text-[9px] px-1.5 py-0 ${TYPE_COLORS['SuccessFactor']}`}>
-          Success Factor
+          {TYPE_LABELS['SuccessFactor']}
         </Badge>
         {overdue && <span className="w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-red-200 flex-shrink-0" title="Trễ hạn" />}
         {/* Clickable title */}
@@ -125,9 +125,9 @@ export function ObjectiveNode({ objective, onItemClick = () => {} }: Props) {
 
   const counts = countDescendants(objective.children || []);
   const statParts: string[] = [];
-  if (counts['SuccessFactor']) statParts.push(`${counts['SuccessFactor']} Success Factors`);
-  if (counts['KeyResult']) statParts.push(`${counts['KeyResult']} Key Results`);
-  if (counts['Feature']) statParts.push(`${counts['Feature']} Features`);
+  if (counts['SuccessFactor']) statParts.push(`${counts['SuccessFactor']} Yếu tố thành công`);
+  if (counts['KeyResult']) statParts.push(`${counts['KeyResult']} Kết quả then chốt`);
+  if (counts['Feature']) statParts.push(`${counts['Feature']} Tính năng`);
 
   return (
     <div className="bg-white rounded-xl border border-[#e0e0e0] shadow-sm hover:shadow-md transition-shadow mb-6 overflow-hidden">
