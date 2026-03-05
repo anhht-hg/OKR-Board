@@ -67,7 +67,7 @@ export function ObjectiveProgressChart({ stats }: Props) {
               <div className="space-y-1.5">
                 <p className="font-semibold text-white">Tiến độ theo mục tiêu</p>
                 <p>Mỗi cột là một mục tiêu. Chiều cao cột = tiến độ được tính theo công thức:</p>
-                <p className="bg-gray-800 rounded px-2 py-1 font-mono text-[10px]">50% × tb.(YTTC/KCTK) + 50% × tb.(tính năng)</p>
+                <p className="bg-gray-800 rounded px-2 py-1 font-mono text-[10px]">50% × tb.(YTTC/KCTC) + 50% × tb.(tính năng)</p>
                 <p>Màu sắc: <span className="text-emerald-400">xanh ≥70%</span> · <span className="text-blue-400">xanh dương 40-70%</span> · <span className="text-orange-400">cam &lt;40%</span></p>
               </div>
             } side="bottom" />

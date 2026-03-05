@@ -93,7 +93,7 @@ export function DashboardStats({ stats }: Props) {
       accentBorder: stats.avgObjectiveProgress >= 70 ? 'border-t-emerald-500' : stats.avgObjectiveProgress >= 40 ? 'border-t-blue-500' : 'border-t-rose-400',
       bar: stats.avgObjectiveProgress >= 70 ? 'bg-emerald-500' : stats.avgObjectiveProgress >= 40 ? 'bg-blue-500' : 'bg-rose-400',
       pct: stats.avgObjectiveProgress,
-      tooltip: `Trung bình tiến độ của ${stats.totalObjectives} mục tiêu. Mỗi mục tiêu = 50% YTTC/KCTK + 50% tất cả tính năng bên dưới.`,
+      tooltip: `Trung bình tiến độ của ${stats.totalObjectives} mục tiêu. Mỗi mục tiêu = 50% YTTC/KCTC + 50% tất cả tính năng bên dưới.`,
     },
     {
       label: 'Triển khai tính năng',

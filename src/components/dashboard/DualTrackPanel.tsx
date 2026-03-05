@@ -168,7 +168,7 @@ export function DualTrackPanel({ featureDelivery: fd, businessOutcomes: bo }: Pr
                 <div className="space-y-1.5">
                   <p className="font-semibold text-white">Kết Quả Đạt Được</p>
                   <p>Đo lường <strong>kết quả thực tế</strong> — người dùng có đón nhận không?</p>
-                  <p><span className="text-teal-400">YTTC/KCTK %</span> = tỷ lệ hoàn thành theo trạng thái (cập nhật thủ công).</p>
+                  <p><span className="text-teal-400">YTTC/KCTC %</span> = tỷ lệ hoàn thành theo trạng thái (cập nhật thủ công).</p>
                   <p><span className="text-green-400">Tiếp nhận %</span> = tb. tiến độ tất cả hạng mục tiếp nhận.</p>
                   <p><span className="text-rose-400">Tác động %</span> = tb. tiến độ tất cả hạng mục tác động.</p>
                   <p><strong>Số lớn góc phải ({bo.avgOutcomePct}%)</strong> = tb. tổng hợp tiếp nhận + tác động.</p>

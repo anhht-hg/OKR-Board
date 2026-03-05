@@ -15,7 +15,7 @@ const TERMS = [
     border: 'border-l-blue-500',
     textColor: 'text-blue-700',
     desc: 'Mục tiêu cấp cao nhất của tổ chức. Định hướng toàn bộ hoạt động trong kỳ kế hoạch.',
-    formula: '50% × tb.(YTTC/KCTK) + 50% × tb.(Tính năng)',
+    formula: '50% × tb.(YTTC/KCTC) + 50% × tb.(Tính năng)',
     role: 'Định hướng chiến lược',
   },
   {
@@ -34,7 +34,7 @@ const TERMS = [
   {
     type: 'KeyResult',
     vn: 'Kết quả then chốt',
-    abbr: 'KCTK',
+    abbr: 'KCTC',
     en: 'Key Result',
     dot: 'bg-slate-600',
     badge: 'bg-slate-700 text-white',
@@ -73,7 +73,7 @@ const TERMS = [
   {
     type: 'Adoption',
     vn: 'Mức độ tiếp nhận',
-    abbr: 'TNDG',
+    abbr: 'MDTN',
     en: 'Adoption',
     dot: 'bg-green-600',
     badge: 'bg-green-600 text-white',
@@ -143,7 +143,7 @@ export function GlossaryButton() {
                   {[
                     { abbr: 'MT', label: 'Mục tiêu', dot: 'bg-blue-600' },
                     { abbr: 'YTTC', label: 'Yếu tố thành công', dot: 'bg-teal-500' },
-                    { abbr: 'KCTK', label: 'Kết quả then chốt', dot: 'bg-slate-600' },
+                    { abbr: 'KCTC', label: 'Kết quả then chốt', dot: 'bg-slate-600' },
                     { abbr: 'TN', label: 'Tính năng', dot: 'bg-pink-500' },
                   ].map((h, i, arr) => (
                     <div key={h.abbr} className="flex items-center gap-1.5">
@@ -160,7 +160,7 @@ export function GlossaryButton() {
                     <span className="text-[10px] text-gray-400 font-semibold">con của TN:</span>
                     {[
                       { abbr: 'NLND', label: 'Năng lực NĐ', dot: 'bg-purple-500' },
-                      { abbr: 'TNDG', label: 'Tiếp nhận', dot: 'bg-green-600' },
+                      { abbr: 'MDTN', label: 'Tiếp nhận', dot: 'bg-green-600' },
                       { abbr: 'TĐ', label: 'Tác động', dot: 'bg-rose-400' },
                     ].map(o => (
                       <div key={o.abbr} className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm">

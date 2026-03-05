@@ -95,7 +95,7 @@ export function ObjectiveTrackChart({ data }: Props) {
               <p className="font-semibold text-white">3 cột cho mỗi mục tiêu</p>
               <p><span className="text-pink-400">■ Triển khai</span> = tb. tiến độ tất cả tính năng (tính từ năng lực người dùng con)</p>
               <p><span className="text-teal-400">■ Kết quả</span> = tb. tiến độ tất cả mức độ tiếp nhận & tác động</p>
-              <p><span className="text-indigo-400">■ Tổng thể</span> = tiến độ đã lưu = 50% YTTC/KCTK + 50% tính năng</p>
+              <p><span className="text-indigo-400">■ Tổng thể</span> = tiến độ đã lưu = 50% YTTC/KCTC + 50% tính năng</p>
               <p className="text-gray-400 text-[10px]">Lý tưởng: cả 3 cột đều cao và đều nhau.</p>
             </div>
           } side="bottom" />
