@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { OkrItem } from '@/types';
 import { TYPE_COLORS, TYPE_LABELS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRight, ChevronDown } from 'lucide-react';
+import { ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
 import { KeyResultNode } from './KeyResultNode';
 import { FeatureNode } from './FeatureNode';
 import { isOverdue } from '@/lib/dateUtils';
@@ -56,7 +56,7 @@ function SuccessFactorNode({ item, onItemClick }: { item: OkrItem; onItemClick: 
 
   return (
     <div className="border-b border-[#e0e0e0] last:border-0">
-      <div className="flex items-center gap-2 py-3 px-5 bg-[#f8f9fa] hover:bg-[#f1f3f4] border-l-[3px] border-teal-400">
+      <div className="group flex items-center gap-2 py-3 px-5 bg-[#f8f9fa] hover:bg-[#f1f3f4] border-l-[3px] border-teal-400">
         {/* Expand toggle */}
         <button
           className="text-[#5f6368] w-4 flex-shrink-0"
@@ -96,6 +96,20 @@ function SuccessFactorNode({ item, onItemClick }: { item: OkrItem; onItemClick: 
           ) : (
             <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STATUS_DOT[item.status] || 'bg-[#5f6368]'}`} title={item.status} />
           )}
+          {isAdmin && (
+            <button
+              className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 border border-red-100 flex-shrink-0"
+              title="Xóa"
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (!confirm(`Xóa "${item.title}"?\nHành động này không thể hoàn tác.`)) return;
+                await fetch(`/api/items/${item.id}`, { method: 'DELETE' });
+                router.refresh();
+              }}
+            >
+              <Trash2 size={11} /> Xóa
+            </button>
+          )}
           <div className="flex items-center gap-1.5 w-24">
             <div className="flex-1 h-1 bg-[#e8f0fe] rounded-full overflow-hidden">
               <div
@@ -132,7 +146,7 @@ export function ObjectiveNode({ objective, onItemClick = () => {} }: Props) {
   return (
     <div className="bg-white rounded-xl border border-[#e0e0e0] shadow-sm hover:shadow-md transition-shadow mb-6 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-4 hover:bg-[#f8f9fa]">
+      <div className="group flex items-center gap-3 px-5 py-4 hover:bg-[#f8f9fa]">
         {/* Expand toggle */}
         <button
           className="text-[#1a73e8] flex-shrink-0"
@@ -172,6 +186,20 @@ export function ObjectiveNode({ objective, onItemClick = () => {} }: Props) {
           <span className="text-sm font-medium text-[#1a73e8]">
             {Math.round(objective.progressPct)}%
           </span>
+          {isAdmin && (
+            <button
+              className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 border border-red-100 flex-shrink-0 ml-1"
+              title="Xóa mục tiêu"
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (!confirm(`Xóa mục tiêu "${objective.title}"?\nTất cả dữ liệu con sẽ bị xóa. Hành động này không thể hoàn tác.`)) return;
+                await fetch(`/api/items/${objective.id}`, { method: 'DELETE' });
+                router.refresh();
+              }}
+            >
+              <Trash2 size={11} /> Xóa
+            </button>
+          )}
         </div>
       </div>
 

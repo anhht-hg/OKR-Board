@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { OkrItem } from '@/types';
 import { TYPE_COLORS, TYPE_LABELS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRight, ChevronDown } from 'lucide-react';
+import { ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
 import { isOverdue } from '@/lib/dateUtils';
 import { nextStatus } from '@/lib/statusUtils';
 import { useAuth } from '@/context/AuthContext';
@@ -40,7 +40,7 @@ export function FeatureNode({ item, depth = 0, onItemClick }: Props) {
   return (
     <div>
       <div
-        className={`flex items-center gap-2 py-2.5 hover:bg-[#f8f9fa] border-b border-[#f1f3f4] text-sm border-l-[3px] ${borderColor}`}
+        className={`group flex items-center gap-2 py-2.5 hover:bg-[#f8f9fa] border-b border-[#f1f3f4] text-sm border-l-[3px] ${borderColor}`}
         style={{ paddingLeft: `${depth * 16 + 20}px` }}
       >
         <button
@@ -90,6 +90,20 @@ export function FeatureNode({ item, depth = 0, onItemClick }: Props) {
             />
           ) : (
             <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STATUS_DOT[item.status] || 'bg-[#5f6368]'}`} title={item.status} />
+          )}
+          {isAdmin && (
+            <button
+              className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 border border-red-100 flex-shrink-0"
+              title="Xóa"
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (!confirm(`Xóa "${item.title}"?\nHành động này không thể hoàn tác.`)) return;
+                await fetch(`/api/items/${item.id}`, { method: 'DELETE' });
+                router.refresh();
+              }}
+            >
+              <Trash2 size={11} /> Xóa
+            </button>
           )}
           <div className="flex items-center gap-1 w-20">
             <div className="flex-1 h-1 bg-[#e8f0fe] rounded-full overflow-hidden">

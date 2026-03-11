@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Sheet,
   SheetContent,
@@ -261,6 +262,7 @@ function CodeBadgeEditor({
 
 export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Props) {
   const { isAdmin } = useAuth();
+  const router = useRouter();
   const [item, setItem] = useState<OkrItem | null>(null);
   const [ancestors, setAncestors] = useState<Ancestor[]>([]);
   const [loading, setLoading] = useState(false);
@@ -342,6 +344,7 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
 
   function handleChildCreated() {
     if (item) fetchItem(item.id);
+    router.refresh();
   }
 
   const statusStyle = item ? STATUS_STYLES[item.status] || STATUS_STYLES['Chưa bắt đầu'] : null;
