@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { RoadmapItem } from '@/types';
 import { TYPE_COLORS, TYPE_LABELS, PROJECTS } from '@/lib/constants';
 import { isOverdue, startOfMonth, endOfMonth, formatMonthVi } from '@/lib/dateUtils';
 import { ItemDetailDrawer } from './ItemDetailDrawer';
-import { ChevronLeft, ChevronRight, Calendar, AlertCircle, CheckCircle2, Activity, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon, Calendar, AlertCircle, CheckCircle2, Activity, Clock } from 'lucide-react';
 
 interface Props {
   items: RoadmapItem[];
@@ -43,6 +43,16 @@ const TYPE_ABBREV: Record<string, string> = {
 
 const ALL_TYPES = ['Objective', 'SuccessFactor', 'KeyResult', 'Feature', 'UserCapability', 'Adoption', 'Impact'];
 
+const TYPE_INDENT: Record<string, number> = {
+  Objective:      0,
+  SuccessFactor:  1,
+  KeyResult:      2,
+  Feature:        3,
+  UserCapability: 4,
+  Adoption:       4,
+  Impact:         4,
+};
+
 function itemIntersectsMonth(item: RoadmapItem, monthStart: Date, monthEnd: Date): boolean {
   const start = item.startDate ? new Date(item.startDate) : null;
   const end = item.endDate ? new Date(item.endDate) : null;
@@ -66,6 +76,7 @@ export function MonthlyTimeline({ items }: Props) {
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const mStart = startOfMonth(viewDate);
   const mEnd = endOfMonth(viewDate);
@@ -122,6 +133,47 @@ export function MonthlyTimeline({ items }: Props) {
 
   const ganttItems = filtered.filter((i) => itemIntersectsMonth(i, mStart, mEnd));
   const undatedItems = filtered.filter((i) => !i.startDate && !i.endDate);
+
+  // Build child map from all items for transitive descendant lookup
+  const childMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const item of items) {
+      if (item.parentId) {
+        if (!map.has(item.parentId)) map.set(item.parentId, []);
+        map.get(item.parentId)!.push(item.id);
+      }
+    }
+    return map;
+  }, [items]);
+
+  // A row has children if it's a key in childMap (has at least one child in full item list)
+  const hasChildren = useMemo(() => new Set(childMap.keys()), [childMap]);
+
+  // Compute set of all hidden IDs (transitive descendants of any collapsed item)
+  const hiddenIds = useMemo(() => {
+    const hidden = new Set<string>();
+    for (const id of collapsed) {
+      const stack = [id];
+      while (stack.length) {
+        const cur = stack.pop()!;
+        for (const childId of childMap.get(cur) ?? []) {
+          hidden.add(childId);
+          stack.push(childId);
+        }
+      }
+    }
+    return hidden;
+  }, [collapsed, childMap]);
+
+  function toggleCollapse(id: string) {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  const visibleGanttItems = ganttItems.filter(i => !hiddenIds.has(i.id));
 
   // Day header marks (every 5 days)
   const dayMarks = [1, 5, 10, 15, 20, 25, 30].filter((d) => d <= totalDays);
@@ -281,6 +333,8 @@ export function MonthlyTimeline({ items }: Props) {
       <div className="px-6 py-5">
         {ganttItems.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-12">Không có mục nào trong tháng này</p>
+        ) : visibleGanttItems.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-12">Tất cả hạng mục đã được thu gọn</p>
         ) : (
           <div className="overflow-x-auto">
             {/* Day header */}
@@ -301,13 +355,32 @@ export function MonthlyTimeline({ items }: Props) {
 
             {/* Rows */}
             <div className="min-w-[640px] space-y-1">
-              {ganttItems.map((item) => {
+              {visibleGanttItems.map((item) => {
                 const style = barStyle(item);
                 const overdue = isOverdue(item.endDate, item.status);
+                const isCollapsed = collapsed.has(item.id);
+                const itemHasChildren = hasChildren.has(item.id);
+                const indent = (TYPE_INDENT[item.type] ?? 0) * 14;
                 return (
                   <div key={item.id} className="flex items-center group">
                     {/* Left label */}
-                    <div className="w-56 flex-shrink-0 flex items-center gap-2 pr-3">
+                    <div className="w-56 flex-shrink-0 flex items-center gap-1 pr-3"
+                      style={{ paddingLeft: `${indent}px` }}
+                    >
+                      {/* Collapse toggle */}
+                      {itemHasChildren ? (
+                        <button
+                          onClick={() => toggleCollapse(item.id)}
+                          className="flex-shrink-0 text-gray-400 hover:text-gray-700 transition-colors"
+                        >
+                          {isCollapsed
+                            ? <ChevronRightIcon size={12} />
+                            : <ChevronDown size={12} />
+                          }
+                        </button>
+                      ) : (
+                        <span className="flex-shrink-0 w-3" />
+                      )}
                       <span
                         className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold flex-shrink-0 ${TYPE_COLORS[item.type]}`}
                       >

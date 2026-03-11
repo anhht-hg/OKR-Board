@@ -15,7 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/objectives', label: 'OKR Tree', icon: Target },
-  { href: '/okr', label: 'OKR Module', icon: LayoutGrid },
+  { href: '/okr', label: 'OKR Chi tiết', icon: LayoutGrid },
 ];
 
 export function Sidebar() {

@@ -71,6 +71,7 @@ export interface RoadmapItem {
   owner: string | null;
   startDate: string | null;
   endDate: string | null;
+  parentId: string | null;
 }
 
 export interface FeatureDeliveryStats {

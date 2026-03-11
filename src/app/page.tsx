@@ -3,9 +3,22 @@ import { DashboardClient } from '@/components/dashboard/DashboardClient';
 import prisma from '@/lib/prisma';
 
 async function getDashboardData() {
-  const allItems = await prisma.okrItem.findMany({
-    select: { id: true, title: true, code: true, type: true, status: true, progressPct: true, project: true, owner: true, startDate: true, endDate: true, parentId: true },
-  });
+  const [allItems, objectivesRaw] = await Promise.all([
+    prisma.okrItem.findMany({
+      select: { id: true, title: true, code: true, type: true, status: true, progressPct: true, project: true, owner: true, startDate: true, endDate: true, parentId: true },
+    }),
+    prisma.okrItem.findMany({
+      where: { type: 'Objective' },
+      orderBy: { sortOrder: 'asc' },
+      select: {
+        id: true, code: true, title: true, progressPct: true, status: true,
+        children: {
+          orderBy: { sortOrder: 'asc' },
+          select: { id: true, code: true, title: true, type: true, progressPct: true, project: true, status: true, owner: true, targetValue: true },
+        },
+      },
+    }),
+  ]);
 
   const totalItems = allItems.length;
   const objectives = allItems.filter((i) => i.type === 'Objective');
@@ -128,7 +141,24 @@ async function getDashboardData() {
       title: o.title,
       progressPct: Math.round(o.progressPct),
     })),
-    objectivesWithChildren: [],
+    objectivesWithChildren: objectivesRaw.map((o) => ({
+      id: o.id,
+      code: o.code,
+      title: o.title,
+      progressPct: Math.round(o.progressPct),
+      status: o.status,
+      children: o.children.map((c) => ({
+        id: c.id,
+        code: c.code,
+        title: c.title,
+        type: c.type,
+        progressPct: Math.round(c.progressPct),
+        project: c.project,
+        status: c.status,
+        owner: c.owner,
+        targetValue: c.targetValue,
+      })),
+    })),
     projectStats,
     featureDelivery,
     businessOutcomes,
@@ -161,6 +191,7 @@ async function getDashboardData() {
       owner: i.owner,
       startDate: i.startDate ? i.startDate.toISOString() : null,
       endDate: i.endDate ? i.endDate.toISOString() : null,
+      parentId: i.parentId,
     })),
     progressTrend: (() => {
       const TREND_COLORS = ['#3b82f6','#10b981','#f97316','#8b5cf6','#ec4899','#06b6d4'];

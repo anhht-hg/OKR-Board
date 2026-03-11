@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { DashboardStats, RawItem, FeatureDeliveryStats, BusinessOutcomesStats, ObjectiveTrackBreakdown } from '@/types';
-import { DashboardStats as DashboardStatsComponent } from './DashboardStats';
+import { ObjectiveCardsPanel } from './ObjectiveCardsPanel';
 import { ObjectiveProgressChart } from './ObjectiveProgressChart';
 import { ProjectStatusChart } from './ProjectStatusChart';
 import { ProjectHealthGrid } from './ProjectHealthGrid';
@@ -11,7 +11,6 @@ import { ProgressTrendChart } from './ProgressTrendChart';
 import { DualTrackPanel } from './DualTrackPanel';
 import { ObjectiveTrackChart } from './ObjectiveTrackChart';
 import { ProgressLogicExplainer } from './ProgressLogicExplainer';
-import { Target, X } from 'lucide-react';
 
 interface Props {
   stats: DashboardStats;
@@ -134,7 +133,7 @@ function computeStats(items: RawItem[], base: DashboardStats, selectedObjId: str
   const roadmapItems = items.map(i => ({
     id: i.id, title: i.title, code: i.code, type: i.type,
     project: i.project, status: i.status, owner: i.owner,
-    startDate: i.startDate, endDate: i.endDate,
+    startDate: i.startDate, endDate: i.endDate, parentId: i.parentId,
   }));
 
   // Progress trend (use same simulated growth logic, filtered objectives only)
@@ -228,72 +227,20 @@ export function DashboardClient({ stats }: Props) {
     [filteredItems, stats, selectedObjId]
   );
 
-  const selectedObj = selectedObjId ? objectives.find(o => o.id === selectedObjId) : null;
-
   return (
     <div className="max-w-[1600px] mx-auto px-8 py-10 space-y-8">
-      {/* Page title + filter bar */}
-      <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-gray-900">Tổng quan OKR 2026</h1>
-          <p className="text-sm text-gray-500 mt-1">HG Entertainment · Cập nhật thời gian thực</p>
-        </div>
-
-        {/* Objective filter pills */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-400 font-medium shrink-0 flex items-center gap-1">
-            <Target size={13} /> Lọc theo mục tiêu:
-          </span>
-          <button
-            onClick={() => setSelectedObjId(null)}
-            className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
-              selectedObjId === null
-                ? 'bg-gray-800 text-white border-gray-800'
-                : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
-            }`}
-          >
-            Tất cả
-          </button>
-          {objectives.map(obj => (
-            <button
-              key={obj.id}
-              onClick={() => setSelectedObjId(prev => prev === obj.id ? null : obj.id)}
-              className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
-                selectedObjId === obj.id
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'
-              }`}
-            >
-              {obj.code ? obj.code : obj.title.substring(0, 10)}
-            </button>
-          ))}
-        </div>
+      {/* Page title */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Tổng quan OKR 2026</h1>
+        <p className="text-sm text-gray-500 mt-1">HG Entertainment · Cập nhật thời gian thực</p>
       </div>
 
-      {/* Active filter banner */}
-      {selectedObj && (
-        <div className="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-          <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
-            <Target size={14} className="text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-blue-500 font-semibold uppercase tracking-wide">Đang lọc theo mục tiêu</p>
-            <p className="text-sm font-semibold text-blue-900 leading-snug">
-              {selectedObj.code && <span className="text-blue-500 mr-1.5">{selectedObj.code}</span>}
-              {selectedObj.title}
-            </p>
-          </div>
-          <button
-            onClick={() => setSelectedObjId(null)}
-            className="flex items-center gap-1.5 text-xs font-medium text-blue-400 hover:text-blue-700 transition-colors shrink-0"
-          >
-            <X size={14} /> Bỏ lọc
-          </button>
-        </div>
-      )}
-
-      {/* KPI Cards */}
-      <DashboardStatsComponent stats={filteredStats} />
+      {/* Objective Cards — click to filter all charts below */}
+      <ObjectiveCardsPanel
+        stats={stats}
+        selectedObjId={selectedObjId}
+        onSelect={setSelectedObjId}
+      />
 
       {/* Dual-track: Delivery vs Outcomes */}
       <DualTrackPanel featureDelivery={filteredStats.featureDelivery} businessOutcomes={filteredStats.businessOutcomes} />
