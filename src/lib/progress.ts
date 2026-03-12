@@ -1,81 +1,158 @@
 import prisma from './prisma';
 import { STATUS_WEIGHT } from './constants';
 
-function avg(items: { progressPct: number }[]): number {
-  if (items.length === 0) return 0;
-  return items.reduce((s, c) => s + c.progressPct, 0) / items.length;
+/**
+ * Core progress formula per the requirement document:
+ *
+ *   progress = (done_committed + done_bonus) / total_committed × 100
+ *
+ * Where:
+ *   - committed = items with chotFlag != 'FALSE' (null/undefined/TRUE — default committed)
+ *   - bonus     = items with chotFlag = 'FALSE'
+ *   - done      = status = 'Hoàn thành' (weight 100), else partial by STATUS_WEIGHT
+ *
+ * This naturally produces:
+ *   - <100%  when not all committed items are done
+ *   - 100%   when all committed items are done, no bonus
+ *   - >100%  when bonus items are also done
+ *
+ * If there are NO committed items at all, fall back to simple avg of all children.
+ */
+function calcChotProgress(
+  children: { progressPct: number; chotFlag: string | null }[]
+): number | null {
+  if (children.length === 0) return null;
+
+  const committed = children.filter(c => c.chotFlag !== 'FALSE');
+
+  if (committed.length === 0) {
+    // All bonus — treat as normal avg, no denominator inflation
+    const total = children.reduce((s, c) => s + c.progressPct, 0);
+    return Math.round(total / children.length);
+  }
+
+  // Numerator: sum of progress of ALL children (committed + bonus)
+  const numerator = children.reduce((s, c) => s + c.progressPct, 0);
+  // Denominator: total_committed × 100 (each committed is worth 100 when done)
+  const denominator = committed.length * 100;
+
+  return Math.round((numerator / denominator) * 100);
 }
 
 /**
  * Calculate the correct progressPct for an item based on its type and children.
- *
- * Rules:
- *  - UserCapability / Adoption / Impact (leaves): STATUS_WEIGHT[status]
- *  - Feature:   avg of UserCapability children only (Adoption & Impact excluded)
- *  - KeyResult: 60% avg(Feature children) + 40% avg(Adoption+Impact grandchildren via Feature)
- *  - SuccessFactor: avg of KeyResult children
- *  - Objective: 50% avg(SuccessFactor children) + 50% avg(all Feature descendants)
- *
- * @param item      The item being calculated (needs .type and .status)
- * @param children  Direct children already loaded (with their progressPct values)
- * @param extraData Optional additional data needed for cross-level lookups
+ * Uses chotFlag-aware formula when children have chotFlag data.
  */
 function calcItemProgress(
   item: { type: string; status: string },
-  children: { type: string; progressPct: number }[],
+  children: { type: string; progressPct: number; chotFlag: string | null }[],
   extraData?: {
-    // For KeyResult: Adoption+Impact items that are grandchildren (Feature's children)
-    outcomeGrandchildren?: { progressPct: number }[];
-    // For Objective: all Feature descendants
-    featureDescendants?: { progressPct: number }[];
+    // For KeyResult: Adoption+Impact grandchildren via Feature children
+    outcomeGrandchildren?: { progressPct: number; chotFlag: string | null }[];
+    // For Objective: all Feature descendants (via KR or directly via SF)
+    featureDescendants?: { progressPct: number; chotFlag: string | null }[];
   }
 ): number {
-  // Leaf nodes — no children, use status weight
+  // Leaf nodes — no children, use status weight directly
   if (children.length === 0) {
     return STATUS_WEIGHT[item.status] ?? 0;
   }
 
   if (item.type === 'Feature') {
-    // Only UserCapability children drive Feature progress
+    // Feature progress = chotFlag-aware progress of UC children
     const ucChildren = children.filter(c => c.type === 'UserCapability');
-    return ucChildren.length > 0
-      ? Math.round(avg(ucChildren))
-      : STATUS_WEIGHT[item.status] ?? 0;
+    if (ucChildren.length === 0) return STATUS_WEIGHT[item.status] ?? 0;
+    return calcChotProgress(ucChildren) ?? STATUS_WEIGHT[item.status] ?? 0;
   }
 
   if (item.type === 'KeyResult') {
+    // KR delivery = chotFlag-aware progress of Feature children
     const featureChildren = children.filter(c => c.type === 'Feature');
-    const deliveryScore = featureChildren.length > 0 ? avg(featureChildren) : 0;
+    const deliveryScore = featureChildren.length > 0
+      ? (calcChotProgress(featureChildren) ?? 0)
+      : 0;
 
     const outcomeItems = extraData?.outcomeGrandchildren ?? [];
     if (outcomeItems.length > 0) {
-      // 60% delivery (Feature/UC) + 40% outcomes (Adoption+Impact)
-      return Math.round(deliveryScore * 0.6 + avg(outcomeItems) * 0.4);
+      const outcomeScore = calcChotProgress(outcomeItems) ?? 0;
+      // 60% delivery + 40% outcomes
+      return Math.round(deliveryScore * 0.6 + outcomeScore * 0.4);
     }
     return Math.round(deliveryScore);
   }
 
   if (item.type === 'Objective') {
-    // "Strategic score" = avg of direct SF children + direct KR children
-    // (some objectives have irregular hierarchies with KR directly under them)
     const strategicChildren = children.filter(
       c => c.type === 'SuccessFactor' || c.type === 'KeyResult'
     );
-    const strategicScore =
-      strategicChildren.length > 0
-        ? avg(strategicChildren)
-        : STATUS_WEIGHT[item.status] ?? 0;
+    // Strategic score: avg of SF/KR rollups (each already has chotFlag bonus baked in)
+    const strategicScore = strategicChildren.length > 0
+      ? strategicChildren.reduce((s, c) => s + c.progressPct, 0) / strategicChildren.length
+      : STATUS_WEIGHT[item.status] ?? 0;
 
     const featureItems = extraData?.featureDescendants ?? [];
     if (featureItems.length > 0) {
-      // 50% strategic (SF/KR rollup) + 50% execution velocity (Feature delivery)
-      return Math.round(strategicScore * 0.5 + avg(featureItems) * 0.5);
+      const featureScore = calcChotProgress(featureItems) ?? 0;
+      return Math.round(strategicScore * 0.5 + featureScore * 0.5);
     }
     return Math.round(strategicScore);
   }
 
-  // SuccessFactor and anything else: simple average of all children
-  return Math.round(avg(children));
+  // SuccessFactor:
+  // - If children are KRs → avg them (KRs already carry bonus in their progressPct)
+  // - If children are Features directly (no KR level) → apply chotFlag-aware formula
+  const featureChildren = children.filter(c => c.type === 'Feature');
+  if (featureChildren.length > 0) {
+    return calcChotProgress(featureChildren) ?? Math.round(
+      children.reduce((s, c) => s + c.progressPct, 0) / children.length
+    );
+  }
+  return Math.round(
+    children.reduce((s, c) => s + c.progressPct, 0) / children.length
+  );
+}
+
+/**
+ * Collect all Feature descendants of an Objective.
+ * Covers both:
+ *   Objective → KR → Feature  (via direct KR children)
+ *   Objective → SF → KR → Feature  (via SF→KR)
+ *   Objective → SF → Feature  (SF has Features directly, no KR level)
+ */
+async function collectFeatureDescendants(
+  objChildren: { id: string; type: string }[]
+): Promise<{ progressPct: number; chotFlag: string | null }[]> {
+  const sfIds = objChildren.filter(c => c.type === 'SuccessFactor').map(c => c.id);
+  const directKrIds = objChildren.filter(c => c.type === 'KeyResult').map(c => c.id);
+
+  // SF children — could be KRs or Features
+  const sfChildren = sfIds.length > 0
+    ? await prisma.okrItem.findMany({
+        where: { parentId: { in: sfIds } },
+        select: { id: true, type: true, progressPct: true, chotFlag: true },
+      })
+    : [];
+
+  // Features directly under SF
+  const sfDirectFeatures = sfChildren.filter(c => c.type === 'Feature');
+  // KRs under SF
+  const sfKrIds = sfChildren.filter(c => c.type === 'KeyResult').map(c => c.id);
+
+  // All KR ids: direct + via SF
+  const allKrIds = [...sfKrIds, ...directKrIds];
+
+  // Features under KRs
+  const krFeatures = allKrIds.length > 0
+    ? await prisma.okrItem.findMany({
+        where: { parentId: { in: allKrIds }, type: 'Feature' },
+        select: { progressPct: true, chotFlag: true },
+      })
+    : [];
+
+  return [
+    ...sfDirectFeatures.map(f => ({ progressPct: f.progressPct, chotFlag: f.chotFlag })),
+    ...krFeatures,
+  ];
 }
 
 /**
@@ -88,46 +165,21 @@ export async function recalcItem(itemId: string): Promise<void> {
   });
   if (!item) return;
 
-  let outcomeGrandchildren: { progressPct: number }[] | undefined;
-  let featureDescendants: { progressPct: number }[] | undefined;
+  let outcomeGrandchildren: { progressPct: number; chotFlag: string | null }[] | undefined;
+  let featureDescendants: { progressPct: number; chotFlag: string | null }[] | undefined;
 
   if (item.type === 'KeyResult') {
-    // Load Adoption+Impact grandchildren (children of Feature children)
-    const featureIds = item.children
-      .filter(c => c.type === 'Feature')
-      .map(c => c.id);
+    const featureIds = item.children.filter(c => c.type === 'Feature').map(c => c.id);
     if (featureIds.length > 0) {
       outcomeGrandchildren = await prisma.okrItem.findMany({
-        where: {
-          parentId: { in: featureIds },
-          type: { in: ['Adoption', 'Impact'] },
-        },
-        select: { progressPct: true },
+        where: { parentId: { in: featureIds }, type: { in: ['Adoption', 'Impact'] } },
+        select: { progressPct: true, chotFlag: true },
       });
     }
   }
 
   if (item.type === 'Objective') {
-    // Collect KR IDs from both paths: SF→KR and direct KR children
-    const sfIds = item.children
-      .filter(c => c.type === 'SuccessFactor')
-      .map(c => c.id);
-    const directKrIds = item.children
-      .filter(c => c.type === 'KeyResult')
-      .map(c => c.id);
-    const sfKrItems = sfIds.length > 0
-      ? await prisma.okrItem.findMany({
-          where: { parentId: { in: sfIds }, type: 'KeyResult' },
-          select: { id: true },
-        })
-      : [];
-    const allKrIds = [...sfKrItems.map(k => k.id), ...directKrIds];
-    if (allKrIds.length > 0) {
-      featureDescendants = await prisma.okrItem.findMany({
-        where: { parentId: { in: allKrIds }, type: 'Feature' },
-        select: { progressPct: true },
-      });
-    }
+    featureDescendants = await collectFeatureDescendants(item.children);
   }
 
   const progress = calcItemProgress(item, item.children, {
@@ -156,44 +208,21 @@ export async function recalcAncestors(itemId: string): Promise<void> {
     });
     if (!parent) break;
 
-    let outcomeGrandchildren: { progressPct: number }[] | undefined;
-    let featureDescendants: { progressPct: number }[] | undefined;
+    let outcomeGrandchildren: { progressPct: number; chotFlag: string | null }[] | undefined;
+    let featureDescendants: { progressPct: number; chotFlag: string | null }[] | undefined;
 
     if (parent.type === 'KeyResult') {
-      const featureIds = parent.children
-        .filter(c => c.type === 'Feature')
-        .map(c => c.id);
+      const featureIds = parent.children.filter(c => c.type === 'Feature').map(c => c.id);
       if (featureIds.length > 0) {
         outcomeGrandchildren = await prisma.okrItem.findMany({
-          where: {
-            parentId: { in: featureIds },
-            type: { in: ['Adoption', 'Impact'] },
-          },
-          select: { progressPct: true },
+          where: { parentId: { in: featureIds }, type: { in: ['Adoption', 'Impact'] } },
+          select: { progressPct: true, chotFlag: true },
         });
       }
     }
 
     if (parent.type === 'Objective') {
-      const sfIds = parent.children
-        .filter(c => c.type === 'SuccessFactor')
-        .map(c => c.id);
-      const directKrIds = parent.children
-        .filter(c => c.type === 'KeyResult')
-        .map(c => c.id);
-      const sfKrItems = sfIds.length > 0
-        ? await prisma.okrItem.findMany({
-            where: { parentId: { in: sfIds }, type: 'KeyResult' },
-            select: { id: true },
-          })
-        : [];
-      const allKrIds = [...sfKrItems.map(k => k.id), ...directKrIds];
-      if (allKrIds.length > 0) {
-        featureDescendants = await prisma.okrItem.findMany({
-          where: { parentId: { in: allKrIds }, type: 'Feature' },
-          select: { progressPct: true },
-        });
-      }
+      featureDescendants = await collectFeatureDescendants(parent.children);
     }
 
     const newPct = calcItemProgress(parent, parent.children, {
@@ -211,18 +240,12 @@ export async function recalcAncestors(itemId: string): Promise<void> {
 }
 
 /**
- * Recalculate all items bottom-up in the correct order:
- * UC/Adoption/Impact → Feature → KeyResult → SuccessFactor → Objective
+ * Recalculate all items bottom-up in the correct order.
  */
 export async function recalcAllFromScratch(): Promise<void> {
   const TYPE_ORDER = [
-    'UserCapability',
-    'Adoption',
-    'Impact',
-    'Feature',
-    'KeyResult',
-    'SuccessFactor',
-    'Objective',
+    'UserCapability', 'Adoption', 'Impact',
+    'Feature', 'KeyResult', 'SuccessFactor', 'Objective',
   ];
 
   for (const type of TYPE_ORDER) {
@@ -232,40 +255,21 @@ export async function recalcAllFromScratch(): Promise<void> {
     });
 
     for (const item of items) {
-      let outcomeGrandchildren: { progressPct: number }[] | undefined;
-      let featureDescendants: { progressPct: number }[] | undefined;
+      let outcomeGrandchildren: { progressPct: number; chotFlag: string | null }[] | undefined;
+      let featureDescendants: { progressPct: number; chotFlag: string | null }[] | undefined;
 
       if (type === 'KeyResult') {
-        const featureIds = item.children
-          .filter(c => c.type === 'Feature')
-          .map(c => c.id);
+        const featureIds = item.children.filter(c => c.type === 'Feature').map(c => c.id);
         if (featureIds.length > 0) {
           outcomeGrandchildren = await prisma.okrItem.findMany({
-            where: {
-              parentId: { in: featureIds },
-              type: { in: ['Adoption', 'Impact'] },
-            },
-            select: { progressPct: true },
+            where: { parentId: { in: featureIds }, type: { in: ['Adoption', 'Impact'] } },
+            select: { progressPct: true, chotFlag: true },
           });
         }
       }
 
       if (type === 'Objective') {
-        const sfIds = item.children.filter(c => c.type === 'SuccessFactor').map(c => c.id);
-        const directKrIds = item.children.filter(c => c.type === 'KeyResult').map(c => c.id);
-        const sfKrItems = sfIds.length > 0
-          ? await prisma.okrItem.findMany({
-              where: { parentId: { in: sfIds }, type: 'KeyResult' },
-              select: { id: true },
-            })
-          : [];
-        const allKrIds = [...sfKrItems.map(k => k.id), ...directKrIds];
-        if (allKrIds.length > 0) {
-          featureDescendants = await prisma.okrItem.findMany({
-            where: { parentId: { in: allKrIds }, type: 'Feature' },
-            select: { progressPct: true },
-          });
-        }
+        featureDescendants = await collectFeatureDescendants(item.children);
       }
 
       const pct = calcItemProgress(item, item.children, {

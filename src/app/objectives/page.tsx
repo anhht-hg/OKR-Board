@@ -1,36 +1,8 @@
 import { Header } from '@/components/layout/Header';
 import { ObjectiveTree } from '@/components/objectives/ObjectiveTree';
 import { CreateItemButton } from '@/components/objectives/CreateItemButton';
-import prisma from '@/lib/prisma';
 
-async function getObjectives() {
-  return prisma.okrItem.findMany({
-    where: { type: 'Objective' },
-    orderBy: { sortOrder: 'asc' },
-    include: {
-      children: {
-        orderBy: { sortOrder: 'asc' },
-        include: {
-          children: {
-            orderBy: { sortOrder: 'asc' },
-            include: {
-              children: {
-                orderBy: { sortOrder: 'asc' },
-                include: {
-                  children: { orderBy: { sortOrder: 'asc' } },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-}
-
-export default async function ObjectivesPage() {
-  const objectives = await getObjectives();
-
+export default function ObjectivesPage() {
   return (
     <>
       <Header title="OKR Tree" />
@@ -45,10 +17,9 @@ export default async function ObjectivesPage() {
             </div>
             <CreateItemButton />
           </div>
-          <ObjectiveTree objectives={objectives as any} />
+          <ObjectiveTree />
         </div>
       </main>
     </>
   );
 }
-export const dynamic = "force-dynamic";

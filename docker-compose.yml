@@ -1,0 +1,21 @@
+services:
+  okr-board:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: file:/app/data/dev.db
+      DB_PATH: /app/data/dev.db
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin2026}
+    volumes:
+      # Named volume — persists the SQLite database across deploys.
+      # Stakeholder data is NEVER lost when you rebuild the image.
+      - okr_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  okr_data:
+    # Docker manages this volume on the host.
+    # To inspect: docker volume inspect okr-board_okr_data
+    # To backup:  docker run --rm -v okr-board_okr_data:/data alpine tar czf - /data > backup.tar.gz

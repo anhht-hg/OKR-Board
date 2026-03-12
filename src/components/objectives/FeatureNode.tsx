@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OkrItem } from '@/types';
 import { TYPE_COLORS, TYPE_LABELS } from '@/lib/constants';
@@ -9,6 +9,8 @@ import { ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
 import { isOverdue } from '@/lib/dateUtils';
 import { nextStatus } from '@/lib/statusUtils';
 import { useAuth } from '@/context/AuthContext';
+import { SortableChildren } from './SortableChildren';
+import { useTreeContext } from '@/context/TreeContext';
 
 const TYPE_BORDER: Record<string, string> = {
   Feature: 'border-pink-400',
@@ -27,12 +29,14 @@ interface Props {
   item: OkrItem;
   depth?: number;
   onItemClick: (id: string) => void;
+  dragHandle?: ReactNode;
 }
 
-export function FeatureNode({ item, depth = 0, onItemClick }: Props) {
+export function FeatureNode({ item, depth = 0, onItemClick, dragHandle }: Props) {
   const [expanded, setExpanded] = useState(false);
   const router = useRouter();
   const { isAdmin } = useAuth();
+  const { compact } = useTreeContext();
   const hasChildren = item.children && item.children.length > 0;
   const borderColor = TYPE_BORDER[item.type] || 'border-gray-300';
   const overdue = isOverdue(item.endDate, item.status);
@@ -43,6 +47,7 @@ export function FeatureNode({ item, depth = 0, onItemClick }: Props) {
         className={`group flex items-center gap-2 py-2.5 hover:bg-[#f8f9fa] border-b border-[#f1f3f4] text-sm border-l-[3px] ${borderColor}`}
         style={{ paddingLeft: `${depth * 16 + 20}px` }}
       >
+        {dragHandle}
         <button
           className="text-[#9aa0a6] w-4 flex-shrink-0"
           onClick={() => hasChildren && setExpanded((e) => !e)}
@@ -105,26 +110,24 @@ export function FeatureNode({ item, depth = 0, onItemClick }: Props) {
               <Trash2 size={11} /> Xóa
             </button>
           )}
-          <div className="flex items-center gap-1 w-20">
-            <div className="flex-1 h-1 bg-[#e8f0fe] rounded-full overflow-hidden">
-              <div
-                className="h-full bg-[#1a73e8] rounded-full"
-                style={{ width: `${Math.round(item.progressPct)}%` }}
-              />
+          {!compact && (
+            <div className="flex items-center gap-1 w-20">
+              <div className="flex-1 h-1 bg-[#e8f0fe] rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${item.progressPct > 100 ? 'bg-gradient-to-r from-violet-500 to-amber-400' : 'bg-[#1a73e8]'}`}
+                  style={{ width: `${Math.min(Math.round(item.progressPct), 100)}%` }}
+                />
+              </div>
+              <span className={`text-[10px] w-6 text-right font-semibold ${item.progressPct > 100 ? 'text-violet-600' : 'text-[#5f6368]'}`}>
+                {Math.round(item.progressPct)}%
+              </span>
             </div>
-            <span className="text-[10px] text-[#5f6368] w-6 text-right">
-              {Math.round(item.progressPct)}%
-            </span>
-          </div>
+          )}
         </div>
       </div>
 
       {expanded && hasChildren && (
-        <div>
-          {item.children!.map((child) => (
-            <FeatureNode key={child.id} item={child} depth={depth + 1} onItemClick={onItemClick} />
-          ))}
-        </div>
+        <SortableChildren items={item.children!} depth={depth + 1} onItemClick={onItemClick} />
       )}
     </div>
   );

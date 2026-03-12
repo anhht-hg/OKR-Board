@@ -28,6 +28,7 @@ const PILLAR_STYLE: Record<string, string> = {
 };
 
 function progressCol(pct: number) {
+  if (pct > 100) return { text: 'text-violet-600',  bar: 'bg-gradient-to-r from-violet-500 to-amber-400' };
   if (pct >= 70) return { text: 'text-emerald-600', bar: 'bg-emerald-500' };
   if (pct >= 30) return { text: 'text-orange-500',  bar: 'bg-orange-400' };
   return               { text: 'text-rose-500',    bar: 'bg-rose-400' };
@@ -286,22 +287,6 @@ function KrRow({ kr, isAdmin }: { kr: any; isAdmin: boolean }) {
       {open && (
         <div className="border-t border-slate-100">
           <div className="px-4 py-4 bg-slate-50 space-y-3">
-            {/* Kết quả then chốt */}
-            <div className="bg-white rounded-lg border border-slate-200 px-4 py-3">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1 flex items-center gap-1">
-                <CheckCircle2 size={10} className="text-emerald-500" /> Kết quả then chốt
-              </p>
-              <InlineEdit
-                itemId={kr.id}
-                field="successMetric"
-                value={kr.successMetric}
-                isAdmin={isAdmin}
-                className="text-sm text-gray-800 leading-relaxed"
-                placeholder="Chưa có kết quả then chốt..."
-                multiline
-              />
-            </div>
-
             <div className="grid grid-cols-2 gap-3">
               {/* Target */}
               <div className="bg-white rounded-lg border border-blue-100 px-4 py-3">
@@ -532,29 +517,20 @@ export function OkrDetailView({ objectives }: { objectives: any[] }) {
     : '';
   const pc = progressCol(obj.progressPct);
 
-  // Group KRs under their preceding SF (siblings in DB, grouped by sort order)
-  const allChildren: any[] = obj.children ?? [];
-  type SfGroup = { sf: any; krs: any[] };
-  const sfGroups: SfGroup[] = [];
-  let currentGroup: SfGroup | null = null;
-  for (const child of allChildren) {
-    if (child.type === 'SuccessFactor') {
-      currentGroup = { sf: child, krs: [] };
-      sfGroups.push(currentGroup);
-    } else if (child.type === 'KeyResult' && currentGroup) {
-      currentGroup.krs.push(child);
-    }
-  }
-  const sfs = sfGroups.map(g => g.sf);
+  // KRs are now true children of SF (correct structure after data migration)
+  const allSFs: any[] = (obj.children ?? []).filter((c: any) => c.type === 'SuccessFactor');
+  // Only show SFs that are committed (chotFlag !== 'FALSE')
+  const sfGroups = allSFs
+    .filter((sf: any) => sf.chotFlag !== 'FALSE')
+    .map((sf: any) => ({
+      sf,
+      krs: (sf.children ?? []).filter((c: any) => c.type === 'KeyResult'),
+    }));
 
   function flatten(items: any[]): any[] {
     return items.flatMap((i: any) => [i, ...flatten(i.children ?? [])]);
   }
-  const allKrs = sfGroups.flatMap(g => g.krs);
-  const allDesc = [
-    ...flatten(allChildren.filter((c: any) => c.type === 'SuccessFactor')),
-    ...flatten(allKrs),
-  ];
+  const allDesc = flatten(allSFs);
   const features = allDesc.filter((i: any) => i.type === 'Feature');
   const outcomes = allDesc.filter((i: any) => ['UserCapability', 'Adoption', 'Impact'].includes(i.type));
   const done = allDesc.filter((i: any) => i.status === 'Hoàn thành').length;
@@ -663,7 +639,7 @@ export function OkrDetailView({ objectives }: { objectives: any[] }) {
           </div>
           <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 grid grid-cols-5 divide-x divide-gray-200 text-center text-xs">
             {[
-              { label: 'Success Factors', val: sfs.length, color: 'text-teal-600' },
+              { label: 'Success Factors', val: sfGroups.length, color: 'text-teal-600' },
               { label: 'Features', val: features.length, color: 'text-pink-500' },
               { label: 'Outcomes', val: outcomes.length, color: 'text-purple-600' },
               { label: 'Hoàn thành', val: done, color: 'text-emerald-600' },

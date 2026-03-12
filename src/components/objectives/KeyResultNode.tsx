@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OkrItem } from '@/types';
 import { TYPE_COLORS, TYPE_LABELS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
-import { FeatureNode } from './FeatureNode';
+import { SortableChildren } from './SortableChildren';
+import { useTreeContext } from '@/context/TreeContext';
 import { isOverdue } from '@/lib/dateUtils';
 import { nextStatus } from '@/lib/statusUtils';
 import { useAuth } from '@/context/AuthContext';
@@ -20,18 +21,21 @@ const STATUS_DOT: Record<string, string> = {
 interface Props {
   item: OkrItem;
   onItemClick: (id: string) => void;
+  dragHandle?: ReactNode;
 }
 
-export function KeyResultNode({ item, onItemClick }: Props) {
+export function KeyResultNode({ item, onItemClick, dragHandle }: Props) {
   const [expanded, setExpanded] = useState(false);
   const router = useRouter();
   const { isAdmin } = useAuth();
+  const { compact } = useTreeContext();
   const hasChildren = item.children && item.children.length > 0;
   const overdue = isOverdue(item.endDate, item.status);
 
   return (
     <div className="border-b border-[#e0e0e0] last:border-0">
       <div className="group flex items-center gap-2 py-3 px-5 hover:bg-[#f8f9fa] border-l-[3px] border-slate-500">
+        {dragHandle}
         <button
           className="text-[#5f6368] w-4 flex-shrink-0"
           onClick={() => hasChildren && setExpanded((e) => !e)}
@@ -90,24 +94,24 @@ export function KeyResultNode({ item, onItemClick }: Props) {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0 w-28">
-          <div className="flex-1 h-1 bg-[#e8f0fe] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#1a73e8] rounded-full"
-              style={{ width: `${Math.round(item.progressPct)}%` }}
-            />
+        {!compact && (
+          <div className="flex items-center gap-1.5 flex-shrink-0 w-28">
+            <div className="flex-1 h-1 bg-[#e8f0fe] rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${item.progressPct > 100 ? 'bg-gradient-to-r from-violet-500 to-amber-400' : 'bg-[#1a73e8]'}`}
+                style={{ width: `${Math.min(Math.round(item.progressPct), 100)}%` }}
+              />
+            </div>
+            <span className={`text-xs w-7 text-right font-semibold ${item.progressPct > 100 ? 'text-violet-600' : 'text-[#5f6368]'}`}>
+              {Math.round(item.progressPct)}%
+            </span>
           </div>
-          <span className="text-xs text-[#5f6368] w-7 text-right">
-            {Math.round(item.progressPct)}%
-          </span>
-        </div>
+        )}
       </div>
 
       {expanded && hasChildren && (
         <div className="border-t border-[#f1f3f4]">
-          {item.children!.map((child) => (
-            <FeatureNode key={child.id} item={child} depth={1} onItemClick={onItemClick} />
-          ))}
+          <SortableChildren items={item.children!} depth={1} onItemClick={onItemClick} />
         </div>
       )}
     </div>

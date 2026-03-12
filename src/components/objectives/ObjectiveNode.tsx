@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { ReactNode, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { OkrItem } from '@/types';
 import { TYPE_COLORS, TYPE_LABELS } from '@/lib/constants';
@@ -11,6 +11,22 @@ import { FeatureNode } from './FeatureNode';
 import { isOverdue } from '@/lib/dateUtils';
 import { nextStatus } from '@/lib/statusUtils';
 import { useAuth } from '@/context/AuthContext';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { SortableItem } from './SortableItem';
+import { useTreeContext } from '@/context/TreeContext';
+import { useQueryClient } from '@tanstack/react-query';
 
 const STATUS_DOT: Record<string, string> = {
   'Chưa bắt đầu': 'bg-[#5f6368]',
@@ -35,28 +51,83 @@ function countDescendants(items: OkrItem[]) {
   return counts;
 }
 
-function renderChildren(items: OkrItem[], onItemClick: (id: string) => void) {
-  return items.map((child) => {
-    if (child.type === 'KeyResult') {
-      return <KeyResultNode key={child.id} item={child} onItemClick={onItemClick} />;
-    }
-    if (child.type === 'SuccessFactor') {
-      return <SuccessFactorNode key={child.id} item={child} onItemClick={onItemClick} />;
-    }
-    return <FeatureNode key={child.id} item={child} depth={0} onItemClick={onItemClick} />;
-  });
+function renderChild(child: OkrItem, onItemClick: (id: string) => void, dragHandle?: ReactNode) {
+  if (child.type === 'KeyResult') {
+    return <KeyResultNode key={child.id} item={child} onItemClick={onItemClick} dragHandle={dragHandle} />;
+  }
+  if (child.type === 'SuccessFactor') {
+    return <SuccessFactorNode key={child.id} item={child} onItemClick={onItemClick} dragHandle={dragHandle} />;
+  }
+  return <FeatureNode key={child.id} item={child} depth={0} onItemClick={onItemClick} dragHandle={dragHandle} />;
 }
 
-function SuccessFactorNode({ item, onItemClick }: { item: OkrItem; onItemClick: (id: string) => void }) {
+function SortableChildrenGroup({ items: initialItems, onItemClick }: { items: OkrItem[]; onItemClick: (id: string) => void }) {
+  const [items, setItems] = useState(initialItems);
+  const isDragging = useRef(false);
+  const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
+
+  // Sync with parent data when not dragging
+  useEffect(() => {
+    if (!isDragging.current) {
+      setItems(initialItems);
+    }
+  }, [initialItems]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      isDragging.current = false;
+      return;
+    }
+
+    const oldIndex = items.findIndex((i) => i.id === active.id);
+    const newIndex = items.findIndex((i) => i.id === over.id);
+    const reordered = arrayMove(items, oldIndex, newIndex);
+
+    setItems(reordered);
+
+    await fetch('/api/items/reorder', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: reordered.map((item, idx) => ({ id: item.id, sortOrder: idx })),
+      }),
+    });
+
+    isDragging.current = false;
+    queryClient.invalidateQueries({ queryKey: ['objectives'] });
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} onDragStart={() => { isDragging.current = true; }}>
+      <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+        {items.map((child) => (
+          <SortableItem key={child.id} id={child.id} disabled={!isAdmin}>
+            {(dragHandle) => renderChild(child, onItemClick, isAdmin ? dragHandle : undefined)}
+          </SortableItem>
+        ))}
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+function SuccessFactorNode({ item, onItemClick, dragHandle }: { item: OkrItem; onItemClick: (id: string) => void; dragHandle?: ReactNode }) {
   const [expanded, setExpanded] = useState(true);
   const router = useRouter();
   const { isAdmin } = useAuth();
+  const { compact } = useTreeContext();
   const hasChildren = item.children && item.children.length > 0;
   const overdue = isOverdue(item.endDate, item.status);
 
   return (
     <div className="border-b border-[#e0e0e0] last:border-0">
       <div className="group flex items-center gap-2 py-3 px-5 bg-[#f8f9fa] hover:bg-[#f1f3f4] border-l-[3px] border-teal-400">
+        {dragHandle}
         {/* Expand toggle */}
         <button
           className="text-[#5f6368] w-4 flex-shrink-0"
@@ -110,21 +181,25 @@ function SuccessFactorNode({ item, onItemClick }: { item: OkrItem; onItemClick: 
               <Trash2 size={11} /> Xóa
             </button>
           )}
-          <div className="flex items-center gap-1.5 w-24">
-            <div className="flex-1 h-1 bg-[#e8f0fe] rounded-full overflow-hidden">
-              <div
-                className="h-full bg-[#1a73e8] rounded-full"
-                style={{ width: `${Math.round(item.progressPct)}%` }}
-              />
+          {!compact && (
+            <div className="flex items-center gap-1.5 w-24">
+              <div className="flex-1 h-1 bg-[#e8f0fe] rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${item.progressPct > 100 ? 'bg-gradient-to-r from-violet-500 to-amber-400' : 'bg-[#1a73e8]'}`}
+                  style={{ width: `${Math.min(Math.round(item.progressPct), 100)}%` }}
+                />
+              </div>
+              <span className={`text-xs w-7 text-right font-semibold ${item.progressPct > 100 ? 'text-violet-600' : 'text-[#5f6368]'}`}>
+                {Math.round(item.progressPct)}%
+              </span>
             </div>
-            <span className="text-xs text-[#5f6368] w-7 text-right">
-              {Math.round(item.progressPct)}%
-            </span>
-          </div>
+          )}
         </div>
       </div>
       {expanded && hasChildren && (
-        <div className="pl-6">{renderChildren(item.children!, onItemClick)}</div>
+        <div className="pl-6">
+          <SortableChildrenGroup items={item.children!} onItemClick={onItemClick} />
+        </div>
       )}
     </div>
   );
@@ -134,6 +209,7 @@ export function ObjectiveNode({ objective, onItemClick = () => {} }: Props) {
   const [expanded, setExpanded] = useState(true);
   const router = useRouter();
   const { isAdmin } = useAuth();
+  const { compact } = useTreeContext();
   const hasChildren = objective.children && objective.children.length > 0;
   const overdue = isOverdue(objective.endDate, objective.status);
 
@@ -183,9 +259,11 @@ export function ObjectiveNode({ objective, onItemClick = () => {} }: Props) {
           ) : (
             <span className={`w-2.5 h-2.5 rounded-full ${STATUS_DOT[objective.status] || 'bg-[#5f6368]'}`} title={objective.status} />
           )}
-          <span className="text-sm font-medium text-[#1a73e8]">
-            {Math.round(objective.progressPct)}%
-          </span>
+          {!compact && (
+            <span className={`text-sm font-medium ${objective.progressPct > 100 ? 'text-violet-600' : 'text-[#1a73e8]'}`}>
+              {Math.round(objective.progressPct)}%
+            </span>
+          )}
           {isAdmin && (
             <button
               className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 border border-red-100 flex-shrink-0 ml-1"
@@ -206,8 +284,8 @@ export function ObjectiveNode({ objective, onItemClick = () => {} }: Props) {
       {/* Progress bar — full width */}
       <div className="h-1.5 bg-[#e8f0fe]">
         <div
-          className="h-full bg-[#1a73e8] transition-all"
-          style={{ width: `${Math.round(objective.progressPct)}%` }}
+          className={`h-full transition-all ${objective.progressPct > 100 ? 'bg-gradient-to-r from-violet-500 to-amber-400' : 'bg-[#1a73e8]'}`}
+          style={{ width: `${Math.min(Math.round(objective.progressPct), 100)}%` }}
         />
       </div>
 
@@ -221,7 +299,7 @@ export function ObjectiveNode({ objective, onItemClick = () => {} }: Props) {
       {/* Children */}
       {expanded && hasChildren && (
         <div className="border-t border-[#e0e0e0]">
-          {renderChildren(objective.children!, onItemClick)}
+          <SortableChildrenGroup items={objective.children!} onItemClick={onItemClick} />
         </div>
       )}
     </div>

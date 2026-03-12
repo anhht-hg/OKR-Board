@@ -15,26 +15,27 @@ async function getData() {
         select: {
           id: true, code: true, type: true, title: true, progressPct: true,
           status: true, owner: true, deadline: true, description: true,
-          targetValue: true, notes: true, project: true,
+          targetValue: true, notes: true, project: true, chotFlag: true,
           successMetric: true, measureFormula: true, corporateKRLinkage: true,
           children: {
             orderBy: { sortOrder: 'asc' },
             select: {
               id: true, code: true, type: true, title: true, progressPct: true,
               status: true, owner: true, deadline: true, description: true,
-              targetValue: true, notes: true, project: true,
+              targetValue: true, notes: true, project: true, chotFlag: true,
               successMetric: true, measureFormula: true, corporateKRLinkage: true,
               children: {
                 orderBy: { sortOrder: 'asc' },
                 select: {
                   id: true, code: true, type: true, title: true, progressPct: true,
                   status: true, owner: true, deadline: true, targetValue: true,
-                  notes: true, project: true,
+                  notes: true, project: true, chotFlag: true,
                   children: {
                     orderBy: { sortOrder: 'asc' },
                     select: {
                       id: true, code: true, type: true, title: true,
                       progressPct: true, status: true, owner: true, targetValue: true,
+                      chotFlag: true,
                     },
                   },
                 },

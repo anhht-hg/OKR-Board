@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Sheet,
   SheetContent,
@@ -43,6 +44,7 @@ interface Ancestor {
   code: string | null;
   title: string;
   type: string;
+  progressPct: number;
 }
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string; label: string }> = {
@@ -75,12 +77,14 @@ const STATUS_DOT: Record<string, string> = {
 };
 
 function getProgressColor(pct: number) {
+  if (pct > 100) return 'text-violet-600';
   if (pct >= 70) return 'text-emerald-500';
   if (pct >= 30) return 'text-orange-500';
   return 'text-rose-500';
 }
 
 function getProgressBarColor(pct: number) {
+  if (pct > 100) return 'bg-gradient-to-r from-violet-500 to-amber-400';
   if (pct >= 70) return 'bg-emerald-500';
   if (pct >= 30) return 'bg-orange-400';
   return 'bg-rose-400';
@@ -263,6 +267,7 @@ function CodeBadgeEditor({
 export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Props) {
   const { isAdmin } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [item, setItem] = useState<OkrItem | null>(null);
   const [ancestors, setAncestors] = useState<Ancestor[]>([]);
   const [loading, setLoading] = useState(false);
@@ -313,6 +318,7 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
       body: JSON.stringify(fields),
     });
     await fetchItem(item.id);
+    queryClient.invalidateQueries({ queryKey: ['objectives'] });
   }
 
   function navigateToChild(childId: string) {
@@ -344,7 +350,7 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
 
   function handleChildCreated() {
     if (item) fetchItem(item.id);
-    router.refresh();
+    queryClient.invalidateQueries({ queryKey: ['objectives'] });
   }
 
   const statusStyle = item ? STATUS_STYLES[item.status] || STATUS_STYLES['Chưa bắt đầu'] : null;
@@ -356,6 +362,7 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
       <SheetContent
         className="w-full sm:max-w-[42vw] p-0 overflow-y-auto border-l border-gray-200 shadow-2xl"
         side="right"
+        onInteractOutside={e => e.preventDefault()}
       >
         <SheetTitle className="sr-only">{item ? item.title : 'Item detail'}</SheetTitle>
 
@@ -376,17 +383,23 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
               <div className="flex items-center gap-1 flex-wrap text-xs">
                 {ancestors.map((anc, i) => {
                   const ancTypeStyle = TYPE_STYLES[anc.type] || { bg: 'bg-gray-500', text: 'text-white' };
+                  const isCurrent = anc.id === item.id;
                   return (
                     <span key={anc.id} className="flex items-center gap-1">
                       {i > 0 && <ChevronRight size={10} className="text-gray-300 mx-0.5" />}
                       <button
                         onClick={() => navigateToBreadcrumb(anc.id)}
-                        className={`transition-colors cursor-pointer flex items-center gap-1 ${anc.id === item.id ? 'text-gray-800 font-semibold' : 'text-gray-400 hover:text-blue-600 hover:underline'}`}
+                        className={`transition-colors cursor-pointer flex items-center gap-1 ${isCurrent ? 'text-gray-800 font-semibold' : 'text-gray-400 hover:text-blue-600 hover:underline'}`}
                       >
                         <span className={`text-[8px] font-bold px-1 py-0.5 rounded ${ancTypeStyle.bg} ${ancTypeStyle.text}`}>
                           {anc.type === 'SuccessFactor' ? 'SF' : anc.type.substring(0, 3).toUpperCase()}
                         </span>
                         {anc.code ? `${anc.code} · ${anc.title.substring(0, 20)}` : anc.title.substring(0, 30)}
+                        {!isCurrent && (
+                          <span className={`text-[9px] font-bold ml-0.5 ${anc.progressPct > 100 ? 'text-violet-500' : anc.progressPct >= 70 ? 'text-emerald-500' : 'text-orange-400'}`}>
+                            {Math.round(anc.progressPct)}%
+                          </span>
+                        )}
                       </button>
                     </span>
                   );
@@ -802,11 +815,33 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
                   </div>
                 )}
 
-                {/* Chot Flag */}
-                {item.chotFlag && (
-                  <div className="text-xs text-gray-500 border-t border-gray-100 pt-4">
-                    <span className="font-semibold text-gray-400 block mb-1">Chốt</span>
-                    {item.chotFlag}
+                {/* Chốt với C-Level */}
+                {(item.chotFlag || isAdmin) && (
+                  <div className="border-t border-gray-100 pt-4">
+                    <span className="text-[10px] text-gray-400 uppercase font-semibold block mb-1">Chốt với C-Level</span>
+                    {isAdmin ? (
+                      <button
+                        onClick={async () => {
+                          const next = item.chotFlag === 'TRUE' ? 'FALSE' : 'TRUE';
+                          await patch({ chotFlag: next });
+                        }}
+                        className={`text-xs font-bold px-3 py-1 rounded-full transition-colors cursor-pointer ${
+                          item.chotFlag === 'TRUE'
+                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        }`}
+                      >
+                        {item.chotFlag === 'TRUE' ? '✓ Đã chốt — Tính vào mục tiêu' : '✗ Chưa chốt — Bonus vượt mục tiêu'}
+                      </button>
+                    ) : (
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                        item.chotFlag === 'TRUE'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {item.chotFlag === 'TRUE' ? '✓ Đã chốt' : '✗ Chưa chốt'}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>

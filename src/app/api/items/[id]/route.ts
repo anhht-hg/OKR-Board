@@ -4,6 +4,20 @@ import prisma from '@/lib/prisma';
 import { recalcItem, recalcAncestors } from '@/lib/progress';
 import { STATUS_WEIGHT } from '@/lib/constants';
 
+/** Recursively cascade chotFlag to all descendants */
+async function cascadeChotFlag(parentId: string, flag: string): Promise<void> {
+  const children = await prisma.okrItem.findMany({
+    where: { parentId },
+    select: { id: true },
+  });
+  if (children.length === 0) return;
+  await prisma.okrItem.updateMany({
+    where: { parentId },
+    data: { chotFlag: flag },
+  });
+  await Promise.all(children.map(c => cascadeChotFlag(c.id, flag)));
+}
+
 async function requireAdmin() {
   const jar = await cookies();
   if (jar.get('okr_role')?.value !== 'admin') {
@@ -55,6 +69,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const {
     title,
+    type,
     status,
     project,
     startDate,
@@ -62,7 +77,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     owner,
     stakeholder,
     chotFlag,
-    isOptional,
     code,
     notes,
     description,
@@ -78,6 +92,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const updateData: Record<string, unknown> = {};
   if (title !== undefined) updateData.title = title;
+  if (type !== undefined) updateData.type = type;
   if (status !== undefined) {
     updateData.status = status;
     updateData.progressPct = STATUS_WEIGHT[status as string] ?? 0;
@@ -88,7 +103,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (owner !== undefined) updateData.owner = owner;
   if (stakeholder !== undefined) updateData.stakeholder = stakeholder;
   if (chotFlag !== undefined) updateData.chotFlag = chotFlag;
-  if (isOptional !== undefined) updateData.isOptional = isOptional;
   if (code !== undefined) updateData.code = code;
   if (notes !== undefined) updateData.notes = notes;
   if (description !== undefined) updateData.description = description;
@@ -106,13 +120,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     data: updateData,
   });
 
-  // Recalculate progress: if this is a leaf (no children), recalculate from status
+  // Inheritance: if chotFlag changed to FALSE, cascade to all descendants
+  if (chotFlag !== undefined) {
+    await cascadeChotFlag(id, chotFlag);
+  }
+
+  // Recalculate progress
   const childCount = await prisma.okrItem.count({ where: { parentId: id } });
-  if (childCount === 0 && status !== undefined) {
-    // progressPct already set above; cascade up
-    await recalcAncestors(id);
-  } else if (childCount > 0) {
+  if (childCount > 0) {
+    // Has children: recalc this item bottom-up (recalcItem also calls recalcAncestors)
     await recalcItem(id);
+  } else if (status !== undefined || chotFlag !== undefined) {
+    // Leaf item with status or chotFlag change: propagate up the ancestor chain
+    await recalcAncestors(id);
   }
 
   return NextResponse.json(item);

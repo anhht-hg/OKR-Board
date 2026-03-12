@@ -24,7 +24,6 @@ export interface OkrItem {
   owner: string | null;
   stakeholder: string | null;
   chotFlag: string | null;
-  isOptional: boolean;
   strategicPillar: string | null;
   deadline: string | null;
   pic: string | null;
