@@ -24,6 +24,7 @@ import {
   Pencil,
   X,
   Check,
+  GitBranch,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TYPE_COLORS as TYPE_COLORS_RAW, TYPE_LABELS, PROJECTS, STATUSES } from '@/lib/constants';
@@ -95,6 +96,16 @@ const NEXT_TYPE: Record<string, string> = {
   SuccessFactor: 'KeyResult',
   KeyResult: 'Feature',
   Feature: 'UserCapability',
+};
+
+// What type must a parent be for each type
+const PARENT_TYPE: Record<string, string> = {
+  SuccessFactor: 'Objective',
+  KeyResult: 'SuccessFactor',
+  Feature: 'KeyResult',
+  UserCapability: 'Feature',
+  Adoption: 'Feature',
+  Impact: 'Feature',
 };
 
 // Double-click to edit field
@@ -264,6 +275,109 @@ function CodeBadgeEditor({
   );
 }
 
+function ChangeParentField({
+  item,
+  onSave,
+}: {
+  item: OkrItem;
+  onSave: (newParentId: string) => Promise<void>;
+}) {
+  const requiredParentType = PARENT_TYPE[item.type];
+  const [expanded, setExpanded] = useState(false);
+  const [search, setSearch] = useState('');
+  const [candidates, setCandidates] = useState<{ id: string; code: string | null; title: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!expanded || !requiredParentType) return;
+    setLoading(true);
+    setError(null);
+    fetch(`/api/items?type=${encodeURIComponent(requiredParentType)}`)
+      .then(r => r.json())
+      .then(data => setCandidates(data.filter((c: { id: string }) => c.id !== item.id)))
+      .finally(() => setLoading(false));
+  }, [expanded, requiredParentType, item.id]);
+
+  if (!requiredParentType) return null;
+
+  const filtered = candidates.filter(c =>
+    `${c.code ?? ''} ${c.title}`.toLowerCase().includes(search.toLowerCase())
+  );
+
+  async function select(newParentId: string) {
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(newParentId);
+      setExpanded(false);
+      setSearch('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Cập nhật thất bại.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2 pb-2 border-b border-gray-100">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <GitBranch size={13} className="text-gray-400" />
+          <span className="text-[10px] text-gray-400 uppercase font-semibold">Chuyển parent</span>
+        </div>
+        <button
+          onClick={() => { setExpanded(v => !v); setSearch(''); }}
+          className={`text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors cursor-pointer ${
+            expanded
+              ? 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+              : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+          }`}
+        >
+          {expanded ? 'Đóng' : 'Chọn'}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="space-y-1.5">
+          <input
+            autoFocus
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={`Tìm ${TYPE_LABELS[requiredParentType]}...`}
+            className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-white"
+          />
+          <div className="rounded-lg border border-gray-100 overflow-hidden divide-y divide-gray-50 max-h-48 overflow-y-auto">
+            {loading ? (
+              <div className="text-xs text-gray-400 py-3 text-center">Đang tải...</div>
+            ) : filtered.length === 0 ? (
+              <div className="text-xs text-gray-400 py-3 text-center">Không có kết quả</div>
+            ) : (
+              filtered.map(c => (
+                <button
+                  key={c.id}
+                  disabled={saving}
+                  onClick={() => select(c.id)}
+                  className="w-full text-left px-3 py-2.5 text-xs hover:bg-blue-50 active:bg-blue-100 transition-colors flex items-start gap-2 disabled:opacity-50 cursor-pointer group"
+                >
+                  {c.code && (
+                    <span className="font-bold text-gray-400 shrink-0 mt-px group-hover:text-blue-500">{c.code}</span>
+                  )}
+                  <span className="text-gray-700 leading-tight group-hover:text-blue-700">{c.title}</span>
+                </button>
+              ))
+            )}
+          </div>
+          {error && (
+            <p className="text-[11px] text-red-600 font-medium px-1">{error}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Props) {
   const { isAdmin } = useAuth();
   const router = useRouter();
@@ -276,6 +390,8 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
   const [editingDates, setEditingDates] = useState(false);
   const [startDateDraft, setStartDateDraft] = useState('');
   const [endDateDraft, setEndDateDraft] = useState('');
+
+  const [typeError, setTypeError] = useState<string | null>(null);
 
   // Internal create-child state
   const [createOpen, setCreateOpen] = useState(false);
@@ -291,12 +407,20 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
         fetch(`/api/items/${id}`),
         fetch(`/api/items/${id}/ancestors`),
       ]);
+      if (!itemRes.ok) {
+        console.error('Failed to load item:', itemRes.status);
+        setItem(null);
+        setAncestors([]);
+        return;
+      }
       const itemData = await itemRes.json();
-      const ancestorData = await ancestorRes.json();
+      const ancestorData = ancestorRes.ok ? await ancestorRes.json() : [];
       setItem(itemData);
       setAncestors(ancestorData);
     } catch (err) {
       console.error('Failed to load item:', err);
+      setItem(null);
+      setAncestors([]);
     } finally {
       setLoading(false);
     }
@@ -310,13 +434,17 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
     }
   }, [itemId, open, fetchItem]);
 
-  async function patch(fields: Record<string, unknown>) {
+  async function patch(fields: Record<string, unknown>): Promise<void> {
     if (!item) return;
-    await fetch(`/api/items/${item.id}`, {
+    const res = await fetch(`/api/items/${item.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(fields),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error || 'Cập nhật thất bại.');
+    }
     await fetchItem(item.id);
     queryClient.invalidateQueries({ queryKey: ['objectives'] });
   }
@@ -425,7 +553,14 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
                     {isAdmin ? (
                       <select
                         value={item.type}
-                        onChange={async e => await patch({ type: e.target.value })}
+                        onChange={async e => {
+                          setTypeError(null);
+                          try {
+                            await patch({ type: e.target.value });
+                          } catch (err) {
+                            setTypeError(err instanceof Error ? err.message : 'Đổi loại thất bại.');
+                          }
+                        }}
                         className={`text-xs font-bold px-2.5 py-1 rounded-md border-0 outline-none cursor-pointer ${typeStyle?.bg} ${typeStyle?.text}`}
                         title="Đổi loại"
                       >
@@ -439,6 +574,9 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
                       </span>
                     ) : null}
                   </div>
+                  {typeError && (
+                    <p className="text-xs text-red-600 font-medium mt-1">{typeError}</p>
+                  )}
 
                   {/* Title — double-click to edit */}
                   {isAdmin ? (
@@ -575,6 +713,17 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
               {/* ── Right: metadata sidebar ── */}
               <div className="w-60 shrink-0 border-l border-gray-100 p-5 bg-gray-50/30 space-y-5 overflow-y-auto">
 
+                {/* Change Parent — shown at top so it's easy to find */}
+                {isAdmin && PARENT_TYPE[item.type] && (
+                  <ChangeParentField
+                    item={item}
+                    onSave={async (newParentId) => {
+                      await patch({ parentId: newParentId });
+                      queryClient.invalidateQueries({ queryKey: ['objectives'] });
+                    }}
+                  />
+                )}
+
                 {/* Status — double-click to change */}
                 {statusStyle && (
                   <div className="space-y-1">
@@ -585,8 +734,11 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
                         disabled={statusUpdating}
                         onChange={async e => {
                           setStatusUpdating(true);
-                          await patch({ status: e.target.value });
-                          setStatusUpdating(false);
+                          try {
+                            await patch({ status: e.target.value });
+                          } finally {
+                            setStatusUpdating(false);
+                          }
                         }}
                         className={`text-xs font-semibold px-3 py-1.5 rounded-full border-0 outline-none cursor-pointer disabled:opacity-60 ${statusStyle.bg} ${statusStyle.text}`}
                         title="Chọn trạng thái"
@@ -844,6 +996,8 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
                     )}
                   </div>
                 )}
+
+
               </div>
             </div>
           </div>

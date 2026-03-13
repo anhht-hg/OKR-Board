@@ -71,6 +71,7 @@ export function CreateItemDrawer({
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [createAnother, setCreateAnother] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Parent picker state
   const [selectedParentId, setSelectedParentId] = useState<string | null>(parentId ?? null);
@@ -187,6 +188,7 @@ export function CreateItemDrawer({
     if (!title || !type) return;
 
     setLoading(true);
+    setSubmitError(null);
     try {
       const res = await fetch('/api/items', {
         method: 'POST',
@@ -223,11 +225,11 @@ export function CreateItemDrawer({
           resetForm();
         }
       } else {
-        const err = await res.json();
-        console.error('Failed to create item:', err);
+        const err = await res.json().catch(() => ({}));
+        setSubmitError(err?.error || 'Tạo thất bại, thử lại.');
       }
-    } catch (err) {
-      console.error('Error creating item:', err);
+    } catch {
+      setSubmitError('Lỗi kết nối, thử lại.');
     } finally {
       setLoading(false);
     }
@@ -278,6 +280,9 @@ export function CreateItemDrawer({
               Create new {selectedTypeObj?.label || 'item'}
             </div>
             <div className="flex items-center gap-2">
+              {submitError && (
+                <span className="text-xs text-red-600 font-medium">{submitError}</span>
+              )}
               <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="text-gray-500 h-8 px-3 text-xs">
                 Cancel
               </Button>
