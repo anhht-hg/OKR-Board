@@ -44,9 +44,10 @@ export function ProjectHealthGrid({ stats }: Props) {
           <InfoTooltip content={
             <div className="space-y-1.5">
               <p className="font-semibold text-white">Sức khỏe dự án</p>
-              <p>Mỗi thẻ = một dự án. Tiến độ % = trung bình tiến độ của tất cả hạng mục thuộc dự án đó.</p>
-              <p>Nhãn sức khỏe: <span className="text-emerald-400">Tốt ≥70%</span> · <span className="text-blue-400">Trung bình 40-70%</span> · <span className="text-orange-400">Cần chú ý &lt;40%</span></p>
-              <p className="text-gray-400 text-[10px]">Một hạng mục có thể thuộc nhiều dự án cùng lúc.</p>
+              <p>Tiến độ % = trung bình có trọng số của các Objective liên quan đến dự án.</p>
+              <p className="text-gray-300 text-[11px]">Trọng số = số hạng mục <span className="text-white font-semibold">đã chốt</span> (Feature/UC/ADO/IMP) của Objective đó thuộc dự án này. Objective có nhiều việc chốt hơn sẽ ảnh hưởng nhiều hơn đến con số.</p>
+              <p>Số đếm (Hoàn thành / Đang làm / Chưa bắt đầu) = các hạng mục thực thi (Feature, UC, ADO, IMP) được gán cho dự án.</p>
+              <p>Nhãn sức khỏe: <span className="text-emerald-400">Tốt ≥70%</span> · <span className="text-blue-400">Trung bình 40–70%</span> · <span className="text-orange-400">Cần chú ý &lt;40%</span></p>
             </div>
           } />
         </div>

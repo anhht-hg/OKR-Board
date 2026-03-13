@@ -155,6 +155,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (status !== undefined) {
     updateData.status = status;
     updateData.progressPct = STATUS_WEIGHT[status as string] ?? 0;
+    if (status === 'Hoàn thành') {
+      updateData.completedAt = new Date();
+    } else {
+      updateData.completedAt = null;
+    }
   }
   if (project !== undefined) updateData.project = project;
   if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null;

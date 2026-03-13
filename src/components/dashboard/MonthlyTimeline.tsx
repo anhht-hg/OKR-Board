@@ -64,7 +64,8 @@ function itemIntersectsMonth(item: RoadmapItem, monthStart: Date, monthEnd: Date
     return end >= monthStart && end <= monthEnd;
   }
   if (start && !end) {
-    return start >= monthStart && start <= monthEnd;
+    // Item has started (before or during this month) with no known end → still active
+    return start <= monthEnd;
   }
   return false;
 }
@@ -74,6 +75,7 @@ export function MonthlyTimeline({ items }: Props) {
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'due' | 'active' | 'completed' | 'overdue' | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -101,6 +103,9 @@ export function MonthlyTimeline({ items }: Props) {
   function toggleProject(p: string) {
     setSelectedProjects((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
   }
+  function toggleStatusFilter(f: 'due' | 'active' | 'completed' | 'overdue') {
+    setStatusFilter((prev) => prev === f ? null : f);
+  }
 
   // Summary counts (all items, not filtered)
   const dueThisMonth = items.filter((i) => {
@@ -122,12 +127,54 @@ export function MonthlyTimeline({ items }: Props) {
     return d >= mStart && d <= mEnd;
   }).length;
 
-  const overdueTotal = items.filter((i) => isOverdue(i.endDate, i.status)).length;
+  const overdueTotal = items.filter((i) => isOverdue(i.endDate, i.status, i.completedAt)).length;
+
+  // Build a quick id→project lookup including ancestor project inheritance
+  const effectiveProject = useMemo(() => {
+    const byId = new Map(items.map(i => [i.id, i]));
+    const cache = new Map<string, string | null>();
+    function resolve(id: string): string | null {
+      if (cache.has(id)) return cache.get(id)!;
+      const item = byId.get(id);
+      if (!item) return null;
+      if (item.project) { cache.set(id, item.project); return item.project; }
+      if (item.parentId) {
+        const p = resolve(item.parentId);
+        cache.set(id, p);
+        return p;
+      }
+      cache.set(id, null);
+      return null;
+    }
+    const result = new Map<string, string | null>();
+    for (const item of items) result.set(item.id, resolve(item.id));
+    return result;
+  }, [items]);
 
   // Filter items for Gantt
   const filtered = items.filter((i) => {
     if (selectedTypes.length > 0 && !selectedTypes.includes(i.type)) return false;
-    if (selectedProjects.length > 0 && !selectedProjects.includes(i.project || '')) return false;
+    if (selectedProjects.length > 0) {
+      const proj = effectiveProject.get(i.id) || '';
+      if (!selectedProjects.includes(proj)) return false;
+    }
+    if (statusFilter === 'due') {
+      if (!i.endDate) return false;
+      const d = new Date(i.endDate);
+      if (!(d >= mStart && d <= mEnd)) return false;
+    }
+    if (statusFilter === 'active') {
+      if (!i.startDate || !i.endDate) return false;
+      const s = new Date(i.startDate);
+      const e = new Date(i.endDate);
+      if (!(s <= today && e >= today && isCurrentMonth)) return false;
+    }
+    if (statusFilter === 'completed') {
+      if (i.status !== 'Hoàn thành') return false;
+    }
+    if (statusFilter === 'overdue') {
+      if (!isOverdue(i.endDate, i.status, i.completedAt)) return false;
+    }
     return true;
   });
 
@@ -239,34 +286,46 @@ export function MonthlyTimeline({ items }: Props) {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 px-6 py-5 border-b border-gray-100">
-        <div className="bg-blue-50 rounded-xl p-4">
+        <button
+          onClick={() => toggleStatusFilter('due')}
+          className={`rounded-xl p-4 text-left transition-all ${statusFilter === 'due' ? 'bg-blue-100 ring-2 ring-blue-400 shadow-sm' : 'bg-blue-50 hover:bg-blue-100'}`}
+        >
           <div className="flex items-center gap-2 mb-2">
             <Clock size={13} className="text-blue-500" />
             <span className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide">Đến hạn tháng này</span>
           </div>
           <span className="text-3xl font-bold text-blue-700">{dueThisMonth}</span>
-        </div>
-        <div className="bg-orange-50 rounded-xl p-4">
+        </button>
+        <button
+          onClick={() => toggleStatusFilter('active')}
+          className={`rounded-xl p-4 text-left transition-all ${statusFilter === 'active' ? 'bg-orange-100 ring-2 ring-orange-400 shadow-sm' : 'bg-orange-50 hover:bg-orange-100'}`}
+        >
           <div className="flex items-center gap-2 mb-2">
             <Activity size={13} className="text-orange-500" />
             <span className="text-[10px] font-semibold text-orange-500 uppercase tracking-wide">Đang hoạt động</span>
           </div>
           <span className="text-3xl font-bold text-orange-600">{activeThisMonth}</span>
-        </div>
-        <div className="bg-emerald-50 rounded-xl p-4">
+        </button>
+        <button
+          onClick={() => toggleStatusFilter('completed')}
+          className={`rounded-xl p-4 text-left transition-all ${statusFilter === 'completed' ? 'bg-emerald-100 ring-2 ring-emerald-400 shadow-sm' : 'bg-emerald-50 hover:bg-emerald-100'}`}
+        >
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle2 size={13} className="text-emerald-500" />
             <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wide">Hoàn thành</span>
           </div>
           <span className="text-3xl font-bold text-emerald-700">{completedThisMonth}</span>
-        </div>
-        <div className="bg-red-50 rounded-xl p-4">
+        </button>
+        <button
+          onClick={() => toggleStatusFilter('overdue')}
+          className={`rounded-xl p-4 text-left transition-all ${statusFilter === 'overdue' ? 'bg-red-100 ring-2 ring-red-400 shadow-sm' : 'bg-red-50 hover:bg-red-100'}`}
+        >
           <div className="flex items-center gap-2 mb-2">
             <AlertCircle size={13} className="text-red-500" />
             <span className="text-[10px] font-semibold text-red-500 uppercase tracking-wide">Trễ hạn</span>
           </div>
           <span className="text-3xl font-bold text-red-600">{overdueTotal}</span>
-        </div>
+        </button>
       </div>
 
       {/* Month nav + filters */}
@@ -357,7 +416,7 @@ export function MonthlyTimeline({ items }: Props) {
             <div className="min-w-[640px] space-y-1">
               {visibleGanttItems.map((item) => {
                 const style = barStyle(item);
-                const overdue = isOverdue(item.endDate, item.status);
+                const overdue = isOverdue(item.endDate, item.status, item.completedAt);
                 const isCollapsed = collapsed.has(item.id);
                 const itemHasChildren = hasChildren.has(item.id);
                 const indent = (TYPE_INDENT[item.type] ?? 0) * 14;

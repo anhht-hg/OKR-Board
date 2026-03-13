@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PROJECTS, STATUSES, TYPE_COLORS, TYPE_LABELS } from '@/lib/constants';
 
 interface Props {
   open: boolean;
@@ -40,25 +41,11 @@ interface Props {
   onCreated?: () => void;
 }
 
-const ITEM_TYPES = [
-  { value: 'Objective', label: 'Objective', color: 'bg-blue-600' },
-  { value: 'SuccessFactor', label: 'Success Factor', color: 'bg-teal-500' },
-  { value: 'KeyResult', label: 'Key Result', color: 'bg-slate-700' },
-  { value: 'Feature', label: 'Feature', color: 'bg-pink-400' },
-  { value: 'UserCapability', label: 'User Capability', color: 'bg-purple-500' },
-  { value: 'Adoption', label: 'Adoption', color: 'bg-green-600' },
-  { value: 'Impact', label: 'Impact', color: 'bg-rose-400' },
-];
-
-const PROJECTS = [
-  'HG Stock',
-  'QL Kênh',
-  'Tài chính',
-  'Quản lý NS',
-  'Dữ liệu & Báo cáo',
-];
-
-const STATUSES = ['Chưa bắt đầu', 'Đang triển khai', 'Hoàn thành'];
+const ITEM_TYPES = Object.entries(TYPE_LABELS).map(([value, label]) => ({
+  value,
+  label,
+  color: TYPE_COLORS[value]?.split(' ')[0] ?? 'bg-gray-500',
+}));
 
 export function CreateItemDrawer({
   open,

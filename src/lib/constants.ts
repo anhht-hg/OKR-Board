@@ -62,3 +62,28 @@ export const ALL_TYPES = [
   'Adoption',
   'Impact',
 ];
+
+// Status dot (indicator) colors — shared across all node components
+export const STATUS_DOT: Record<string, string> = {
+  'Chưa bắt đầu': 'bg-[#5f6368]',
+  'Đang triển khai': 'bg-[#fbbc04]',
+  'Hoàn thành': 'bg-[#34a853]',
+};
+
+// Next child type in hierarchy (used for "add child" actions)
+export const NEXT_CHILD_TYPE: Record<string, string> = {
+  Objective: 'SuccessFactor',
+  SuccessFactor: 'KeyResult',
+  KeyResult: 'Feature',
+  Feature: 'UserCapability',
+};
+
+// Required parent type for each child type (inverse of CHILD_TYPES)
+export const PARENT_TYPE: Record<string, string> = {
+  SuccessFactor: 'Objective',
+  KeyResult: 'SuccessFactor',
+  Feature: 'KeyResult',
+  UserCapability: 'Feature',
+  Adoption: 'Feature',
+  Impact: 'Feature',
+};

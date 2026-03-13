@@ -26,6 +26,7 @@ model OkrItem {
   stakeholder String?
   chotFlag    String?
   isOptional  Boolean   @default(false)
+  completedAt DateTime?
 
   // Strategic fields (File 2, read-only in UI)
   strategicPillar    String?

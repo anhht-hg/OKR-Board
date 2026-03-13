@@ -11,8 +11,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   async function refetch() {
-    const d = await fetch('/api/auth/me').then(r => r.json());
-    setRole(d.role);
+    try {
+      const r = await fetch('/api/auth/me');
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d.role === 'admin' || d.role === 'viewer') setRole(d.role);
+    } catch {
+      // network error — keep current role
+    }
   }
 
   useEffect(() => { refetch(); }, []);

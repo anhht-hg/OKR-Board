@@ -3,7 +3,7 @@
 import { ReactNode, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OkrItem } from '@/types';
-import { TYPE_COLORS, TYPE_LABELS } from '@/lib/constants';
+import { TYPE_COLORS, TYPE_LABELS, STATUS_DOT } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
 import { isOverdue } from '@/lib/dateUtils';
@@ -17,12 +17,6 @@ const TYPE_BORDER: Record<string, string> = {
   UserCapability: 'border-purple-400',
   Adoption: 'border-green-500',
   Impact: 'border-rose-400',
-};
-
-const STATUS_DOT: Record<string, string> = {
-  'Chưa bắt đầu': 'bg-[#5f6368]',
-  'Đang triển khai': 'bg-[#fbbc04]',
-  'Hoàn thành': 'bg-[#34a853]',
 };
 
 interface Props {
@@ -39,7 +33,7 @@ export function FeatureNode({ item, depth = 0, onItemClick, dragHandle }: Props)
   const { compact } = useTreeContext();
   const hasChildren = item.children && item.children.length > 0;
   const borderColor = TYPE_BORDER[item.type] || 'border-gray-300';
-  const overdue = isOverdue(item.endDate, item.status);
+  const overdue = isOverdue(item.endDate, item.status, item.completedAt);
 
   return (
     <div>
@@ -85,12 +79,12 @@ export function FeatureNode({ item, depth = 0, onItemClick, dragHandle }: Props)
               title={`${item.status} → nhấn để đổi`}
               onClick={async (e) => {
                 e.stopPropagation();
-                await fetch(`/api/items/${item.id}`, {
+                const res = await fetch(`/api/items/${item.id}`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ status: nextStatus(item.status) }),
                 });
-                router.refresh();
+                if (res.ok) router.refresh();
               }}
             />
           ) : (
@@ -103,8 +97,8 @@ export function FeatureNode({ item, depth = 0, onItemClick, dragHandle }: Props)
               onClick={async (e) => {
                 e.stopPropagation();
                 if (!confirm(`Xóa "${item.title}"?\nHành động này không thể hoàn tác.`)) return;
-                await fetch(`/api/items/${item.id}`, { method: 'DELETE' });
-                router.refresh();
+                const res = await fetch(`/api/items/${item.id}`, { method: 'DELETE' });
+                if (res.ok) router.refresh();
               }}
             >
               <Trash2 size={11} /> Xóa

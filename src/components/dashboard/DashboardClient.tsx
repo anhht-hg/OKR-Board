@@ -115,25 +115,60 @@ function computeStats(items: RawItem[], base: DashboardStats, selectedObjId: str
     };
   });
 
-  // Project stats
+  // Project stats — weighted average of Objective progress by committed work items per project
+  const WORK_TYPES = new Set(['Feature', 'UserCapability', 'Adoption', 'Impact']);
   const projects = [...new Set(items.map(i => i.project).filter(Boolean))] as string[];
+
+  function collectDescIds(rootId: string): Set<string> {
+    const result = new Set<string>();
+    const stack = [rootId];
+    while (stack.length) {
+      const id = stack.pop()!;
+      result.add(id);
+      for (const c of childMap.get(id) ?? []) stack.push(c.id);
+    }
+    return result;
+  }
+
+  const descCache = new Map<string, Set<string>>();
+  const getDescIds = (id: string) => {
+    if (!descCache.has(id)) descCache.set(id, collectDescIds(id));
+    return descCache.get(id)!;
+  };
+
+  const allObjectives = items.filter(i => i.type === 'Objective');
+
   const projectStats = projects.map(project => {
-    const pItems = items.filter(i => i.project === project);
-    return {
-      project,
-      total: pItems.length,
-      completed: pItems.filter(i => i.status === 'Hoàn thành').length,
-      inProgress: pItems.filter(i => i.status === 'Đang triển khai').length,
-      notStarted: pItems.filter(i => i.status === 'Chưa bắt đầu').length,
-      progressPct: pItems.length > 0 ? Math.round(pItems.reduce((s, i) => s + i.progressPct, 0) / pItems.length) : 0,
-    };
+    const taggedWork = items.filter(i => i.project === project && WORK_TYPES.has(i.type));
+
+    // Weighted average: obj.progressPct × committed work items of this project under obj
+    let weightedSum = 0;
+    let totalWeight = 0;
+    for (const obj of allObjectives) {
+      const descIds = getDescIds(obj.id);
+      const objWork = taggedWork.filter(w => descIds.has(w.id));
+      if (objWork.length === 0) continue;
+      const committed = objWork.filter(w => w.chotFlag !== 'FALSE');
+      const weight = committed.length > 0 ? committed.length : objWork.length;
+      weightedSum += obj.progressPct * weight;
+      totalWeight += weight;
+    }
+
+    const progressPct = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
+    const total      = taggedWork.length;
+    const completed  = taggedWork.filter(i => i.status === 'Hoàn thành').length;
+    const inProgress = taggedWork.filter(i => i.status === 'Đang triển khai').length;
+    const notStarted = taggedWork.filter(i => i.status === 'Chưa bắt đầu').length;
+
+    return { project, total, completed, inProgress, notStarted, progressPct };
   });
 
   // Roadmap items
   const roadmapItems = items.map(i => ({
     id: i.id, title: i.title, code: i.code, type: i.type,
     project: i.project, status: i.status, owner: i.owner,
-    startDate: i.startDate, endDate: i.endDate, parentId: i.parentId,
+    progressPct: i.progressPct,
+    startDate: i.startDate, endDate: i.endDate, completedAt: i.completedAt, parentId: i.parentId,
   }));
 
   // Progress trend (use same simulated growth logic, filtered objectives only)
@@ -264,8 +299,8 @@ export function DashboardClient({ stats }: Props) {
       {/* Monthly timeline */}
       <MonthlyTimeline items={filteredStats.roadmapItems} />
 
-      {/* Project health */}
-      <ProjectHealthGrid stats={filteredStats} />
+      {/* Project health — always shows global stats, not filtered by objective */}
+      <ProjectHealthGrid stats={stats} />
 
       {/* Progress Calculation Logic */}
       <ProgressLogicExplainer />

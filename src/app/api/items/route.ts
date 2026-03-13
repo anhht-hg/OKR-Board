@@ -77,12 +77,22 @@ export async function POST(req: NextRequest) {
     select: { sortOrder: true },
   });
 
+  // Auto-inherit project from parent if not explicitly provided
+  let resolvedProject = project || null;
+  if (!resolvedProject && parentId) {
+    const parent = await prisma.okrItem.findUnique({
+      where: { id: parentId },
+      select: { project: true },
+    });
+    resolvedProject = parent?.project || null;
+  }
+
   const item = await prisma.okrItem.create({
     data: {
       title,
       type,
       parentId: parentId || null,
-      project: project || null,
+      project: resolvedProject,
       status,
       startDate: startDate ? new Date(startDate) : null,
       endDate: endDate ? new Date(endDate) : null,

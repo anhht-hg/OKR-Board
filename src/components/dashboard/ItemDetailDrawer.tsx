@@ -27,7 +27,7 @@ import {
   GitBranch,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { TYPE_COLORS as TYPE_COLORS_RAW, TYPE_LABELS, PROJECTS, STATUSES } from '@/lib/constants';
+import { TYPE_COLORS as TYPE_COLORS_RAW, TYPE_LABELS, PROJECTS, STATUSES, ALL_TYPES, NEXT_CHILD_TYPE, PARENT_TYPE } from '@/lib/constants';
 import { CreateItemDrawer } from './CreateItemDrawer';
 import { isOverdue } from '@/lib/dateUtils';
 import { nextStatus } from '@/lib/statusUtils';
@@ -61,8 +61,6 @@ const TYPE_STYLES: Record<string, { bg: string; text: string }> = Object.fromEnt
   })
 );
 
-const ALL_TYPES = ['Objective', 'SuccessFactor', 'KeyResult', 'Feature', 'UserCapability', 'Adoption', 'Impact'];
-
 const PROJECT_COLORS: Record<string, { bg: string; text: string }> = {
   'HG Stock': { bg: 'bg-red-100', text: 'text-red-700' },
   'QL Kênh': { bg: 'bg-emerald-100', text: 'text-emerald-700' },
@@ -90,23 +88,6 @@ function getProgressBarColor(pct: number) {
   if (pct >= 30) return 'bg-orange-400';
   return 'bg-rose-400';
 }
-
-const NEXT_TYPE: Record<string, string> = {
-  Objective: 'SuccessFactor',
-  SuccessFactor: 'KeyResult',
-  KeyResult: 'Feature',
-  Feature: 'UserCapability',
-};
-
-// What type must a parent be for each type
-const PARENT_TYPE: Record<string, string> = {
-  SuccessFactor: 'Objective',
-  KeyResult: 'SuccessFactor',
-  Feature: 'KeyResult',
-  UserCapability: 'Feature',
-  Adoption: 'Feature',
-  Impact: 'Feature',
-};
 
 // Double-click to edit field
 function InlineField({
@@ -295,8 +276,9 @@ function ChangeParentField({
     setLoading(true);
     setError(null);
     fetch(`/api/items?type=${encodeURIComponent(requiredParentType)}`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(data => setCandidates(data.filter((c: { id: string }) => c.id !== item.id)))
+      .catch(err => setError(err.message ?? 'Lỗi tải dữ liệu'))
       .finally(() => setLoading(false));
   }, [expanded, requiredParentType, item.id]);
 
@@ -439,6 +421,7 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
     const res = await fetch(`/api/items/${item.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
+
       body: JSON.stringify(fields),
     });
     if (!res.ok) {
@@ -447,6 +430,7 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
     }
     await fetchItem(item.id);
     queryClient.invalidateQueries({ queryKey: ['objectives'] });
+    router.refresh();
   }
 
   function navigateToChild(childId: string) {
@@ -467,7 +451,7 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
 
   function handleAddChild(parentId: string, parentType: string) {
     if (onAddChild) { onAddChild(parentId, parentType); return; }
-    const nextType = NEXT_TYPE[parentType];
+    const nextType = NEXT_CHILD_TYPE[parentType];
     if (!nextType) return;
     setCreateParentId(parentId);
     setCreateParentType(parentType);
@@ -479,6 +463,7 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
   function handleChildCreated() {
     if (item) fetchItem(item.id);
     queryClient.invalidateQueries({ queryKey: ['objectives'] });
+    router.refresh();
   }
 
   const statusStyle = item ? STATUS_STYLES[item.status] || STATUS_STYLES['Chưa bắt đầu'] : null;
@@ -654,7 +639,7 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
                       <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                         Nested items ({item.children.length})
                       </h4>
-                      {isAdmin && NEXT_TYPE[item.type] && (
+                      {isAdmin && NEXT_CHILD_TYPE[item.type] && (
                         <button
                           onClick={() => handleAddChild(item.id, item.type)}
                           className="p-1 rounded-md hover:bg-gray-100 text-blue-500 transition-colors cursor-pointer"
@@ -701,7 +686,7 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
                 {item.children && item.children.length === 0 && (
                   <div className="text-center py-8 px-4 border border-dashed border-gray-200 rounded-xl">
                     <p className="text-sm text-gray-400 mb-4">Không có mục con</p>
-                    {isAdmin && NEXT_TYPE[item.type] && (
+                    {isAdmin && NEXT_CHILD_TYPE[item.type] && (
                       <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => handleAddChild(item.id, item.type)}>
                         <Plus className="mr-1.5 h-3 w-3" /> Thêm mục con
                       </Button>
@@ -836,7 +821,7 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
 
                 {/* Dates */}
                 {(() => {
-                  const overdue = isOverdue(item.endDate, item.status);
+                  const overdue = isOverdue(item.endDate, item.status, item.completedAt);
                   const hasDate = item.startDate || item.endDate;
                   if (!hasDate && !isAdmin) return null;
                   return (

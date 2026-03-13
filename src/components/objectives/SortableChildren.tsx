@@ -56,7 +56,7 @@ export function SortableChildren({ items: initialItems, depth = 0, onItemClick }
 
     setItems(reordered); // optimistic update
 
-    await fetch('/api/items/reorder', {
+    const res = await fetch('/api/items/reorder', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -65,7 +65,8 @@ export function SortableChildren({ items: initialItems, depth = 0, onItemClick }
     });
 
     isDragging.current = false;
-    queryClient.invalidateQueries({ queryKey: ['objectives'] });
+    if (res.ok) queryClient.invalidateQueries({ queryKey: ['objectives'] });
+    else setItems(initialItems); // revert on failure
   }
 
   return (

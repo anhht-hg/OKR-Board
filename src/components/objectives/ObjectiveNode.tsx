@@ -3,7 +3,7 @@
 import { ReactNode, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { OkrItem } from '@/types';
-import { TYPE_COLORS, TYPE_LABELS } from '@/lib/constants';
+import { TYPE_COLORS, TYPE_LABELS, STATUS_DOT } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
 import { KeyResultNode } from './KeyResultNode';
@@ -27,12 +27,6 @@ import {
 import { SortableItem } from './SortableItem';
 import { useTreeContext } from '@/context/TreeContext';
 import { useQueryClient } from '@tanstack/react-query';
-
-const STATUS_DOT: Record<string, string> = {
-  'Chưa bắt đầu': 'bg-[#5f6368]',
-  'Đang triển khai': 'bg-[#fbbc04]',
-  'Hoàn thành': 'bg-[#34a853]',
-};
 
 interface Props {
   objective: OkrItem;
@@ -91,7 +85,7 @@ function SortableChildrenGroup({ items: initialItems, onItemClick }: { items: Ok
 
     setItems(reordered);
 
-    await fetch('/api/items/reorder', {
+    const res = await fetch('/api/items/reorder', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -100,7 +94,8 @@ function SortableChildrenGroup({ items: initialItems, onItemClick }: { items: Ok
     });
 
     isDragging.current = false;
-    queryClient.invalidateQueries({ queryKey: ['objectives'] });
+    if (res.ok) queryClient.invalidateQueries({ queryKey: ['objectives'] });
+    else setItems(initialItems); // revert on failure
   }
 
   return (
@@ -122,7 +117,7 @@ function SuccessFactorNode({ item, onItemClick, dragHandle }: { item: OkrItem; o
   const { isAdmin } = useAuth();
   const { compact } = useTreeContext();
   const hasChildren = item.children && item.children.length > 0;
-  const overdue = isOverdue(item.endDate, item.status);
+  const overdue = isOverdue(item.endDate, item.status, item.completedAt);
 
   return (
     <div className="border-b border-[#e0e0e0] last:border-0">
@@ -156,12 +151,12 @@ function SuccessFactorNode({ item, onItemClick, dragHandle }: { item: OkrItem; o
               title={`${item.status} → nhấn để đổi`}
               onClick={async (e) => {
                 e.stopPropagation();
-                await fetch(`/api/items/${item.id}`, {
+                const res = await fetch(`/api/items/${item.id}`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ status: nextStatus(item.status) }),
                 });
-                router.refresh();
+                if (res.ok) router.refresh();
               }}
             />
           ) : (
@@ -174,8 +169,8 @@ function SuccessFactorNode({ item, onItemClick, dragHandle }: { item: OkrItem; o
               onClick={async (e) => {
                 e.stopPropagation();
                 if (!confirm(`Xóa "${item.title}"?\nHành động này không thể hoàn tác.`)) return;
-                await fetch(`/api/items/${item.id}`, { method: 'DELETE' });
-                router.refresh();
+                const res = await fetch(`/api/items/${item.id}`, { method: 'DELETE' });
+                if (res.ok) router.refresh();
               }}
             >
               <Trash2 size={11} /> Xóa
@@ -211,7 +206,7 @@ export function ObjectiveNode({ objective, onItemClick = () => {} }: Props) {
   const { isAdmin } = useAuth();
   const { compact } = useTreeContext();
   const hasChildren = objective.children && objective.children.length > 0;
-  const overdue = isOverdue(objective.endDate, objective.status);
+  const overdue = isOverdue(objective.endDate, objective.status, objective.completedAt);
 
   const counts = countDescendants(objective.children || []);
   const statParts: string[] = [];
@@ -248,12 +243,12 @@ export function ObjectiveNode({ objective, onItemClick = () => {} }: Props) {
               title={`${objective.status} → nhấn để đổi`}
               onClick={async (e) => {
                 e.stopPropagation();
-                await fetch(`/api/items/${objective.id}`, {
+                const res = await fetch(`/api/items/${objective.id}`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ status: nextStatus(objective.status) }),
                 });
-                router.refresh();
+                if (res.ok) router.refresh();
               }}
             />
           ) : (
@@ -271,8 +266,8 @@ export function ObjectiveNode({ objective, onItemClick = () => {} }: Props) {
               onClick={async (e) => {
                 e.stopPropagation();
                 if (!confirm(`Xóa mục tiêu "${objective.title}"?\nTất cả dữ liệu con sẽ bị xóa. Hành động này không thể hoàn tác.`)) return;
-                await fetch(`/api/items/${objective.id}`, { method: 'DELETE' });
-                router.refresh();
+                const res = await fetch(`/api/items/${objective.id}`, { method: 'DELETE' });
+                if (res.ok) router.refresh();
               }}
             >
               <Trash2 size={11} /> Xóa

@@ -48,7 +48,8 @@ async function getData() {
   });
 
   // Serialize dates and return
-  function serializeItem(item: any): any {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function serializeItem(item: Record<string, any>): Record<string, any> {
     return {
       ...item,
       deadline: item.deadline ?? null,

@@ -21,6 +21,7 @@ export interface OkrItem {
   status: Status;
   startDate: string | null;
   endDate: string | null;
+  completedAt: string | null;
   owner: string | null;
   stakeholder: string | null;
   chotFlag: string | null;
@@ -68,8 +69,10 @@ export interface RoadmapItem {
   project: string | null;
   status: string;
   owner: string | null;
+  progressPct: number;
   startDate: string | null;
   endDate: string | null;
+  completedAt: string | null;
   parentId: string | null;
 }
 
@@ -123,8 +126,10 @@ export interface RawItem {
   progressPct: number;
   project: string | null;
   owner: string | null;
+  chotFlag: string | null;
   startDate: string | null;
   endDate: string | null;
+  completedAt: string | null;
   parentId: string | null;
 }
 

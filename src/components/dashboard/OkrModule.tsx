@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardStats } from '@/types';
+import { NEXT_CHILD_TYPE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ObjectiveCard } from './ObjectiveCard';
@@ -89,26 +90,13 @@ export function OkrModule({ stats }: Props) {
     setCreateDrawerOpen(true);
   }
 
-  const NEXT_TYPE: Record<string, string> = {
-    'Objective': 'SuccessFactor',
-    'SuccessFactor': 'KeyResult',
-    'KeyResult': 'Feature',
-    'Feature': 'UserCapability',
-  };
-
   function handleCreateChild(parentId: string, parentType: string) {
-    // Bug 7: guard against leaf node types with no next type
-    const nextType = NEXT_TYPE[parentType];
+    const nextType = NEXT_CHILD_TYPE[parentType];
     if (!nextType) return;
     setCreateItemType(nextType);
     setCreateParentId(parentId);
     setCreateParentType(parentType);
     setCreateDrawerOpen(true);
-  }
-
-  // Bug 1: use router.refresh() instead of window.location.reload()
-  function refreshData() {
-    router.refresh();
   }
 
   const selectedObjective = stats.objectivesWithChildren.find((o) => o.id === selectedId);
@@ -227,7 +215,7 @@ export function OkrModule({ stats }: Props) {
           parentId={createParentId}
           parentType={createParentType}
           initialType={createItemType}
-          onCreated={refreshData}
+          onCreated={() => router.refresh()}
         />
       </div>
     );
@@ -363,7 +351,7 @@ export function OkrModule({ stats }: Props) {
         parentId={createParentId}
         parentType={createParentType}
         initialType={createItemType}
-        onCreated={refreshData}
+        onCreated={() => router.refresh()}
       />
     </div>
   );

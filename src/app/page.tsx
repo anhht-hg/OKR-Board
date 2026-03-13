@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma';
 async function getDashboardData() {
   const [allItems, objectivesRaw] = await Promise.all([
     prisma.okrItem.findMany({
-      select: { id: true, title: true, code: true, type: true, status: true, progressPct: true, project: true, owner: true, startDate: true, endDate: true, parentId: true },
+      select: { id: true, title: true, code: true, type: true, status: true, progressPct: true, project: true, owner: true, startDate: true, endDate: true, completedAt: true, parentId: true, chotFlag: true },
     }),
     prisma.okrItem.findMany({
       where: { type: 'Objective' },
@@ -35,20 +35,8 @@ async function getDashboardData() {
       : 0;
 
   const projects = [...new Set(allItems.map((i) => i.project).filter(Boolean))] as string[];
-  const projectStats = projects.map((project) => {
-    const items = allItems.filter((i) => i.project === project);
-    const completed = items.filter((i) => i.status === 'Hoàn thành').length;
-    const inProgress = items.filter((i) => i.status === 'Đang triển khai').length;
-    const notStarted = items.filter((i) => i.status === 'Chưa bắt đầu').length;
-    const pct =
-      items.length > 0
-        ? Math.round(items.reduce((s, i) => s + i.progressPct, 0) / items.length)
-        : 0;
-    return { project, total: items.length, completed, inProgress, notStarted, progressPct: pct };
-  });
 
-  // ── Dual-track stats ───────────────────────────────────────────────────────
-  // Build parent→children map for in-memory hierarchy traversal
+  // ── Shared childMap for both projectStats and dual-track ───────────────────
   const childMap = new Map<string, typeof allItems>();
   for (const item of allItems) {
     if (item.parentId) {
@@ -57,6 +45,64 @@ async function getDashboardData() {
     }
   }
   const byId = new Map(allItems.map(i => [i.id, i]));
+
+  // Collect all descendant IDs of a node (inclusive)
+  function collectDescendantIds(rootId: string): Set<string> {
+    const result = new Set<string>();
+    const stack = [rootId];
+    while (stack.length) {
+      const id = stack.pop()!;
+      result.add(id);
+      for (const c of childMap.get(id) ?? []) stack.push(c.id);
+    }
+    return result;
+  }
+
+  // Work items = Feature + UC + Adoption + Impact (executable work, no double-counting)
+  const WORK_TYPES = new Set(['Feature', 'UserCapability', 'Adoption', 'Impact']);
+
+  const projectStats = projects.map((project) => {
+    // All work items tagged with this project
+    const taggedWork = allItems.filter(i => i.project === project && WORK_TYPES.has(i.type));
+
+    // For each Objective, compute its committed work item count for this project
+    // weight = committed items (chotFlag != 'FALSE') of this project under that objective
+    const objectives = allItems.filter(i => i.type === 'Objective');
+    const objDescCache = new Map<string, Set<string>>();
+    const getDescIds = (id: string) => {
+      if (!objDescCache.has(id)) objDescCache.set(id, collectDescendantIds(id));
+      return objDescCache.get(id)!;
+    };
+
+    let weightedSum = 0;
+    let totalWeight = 0;
+
+    for (const obj of objectives) {
+      const descIds = getDescIds(obj.id);
+      const objProjectWork = taggedWork.filter(w => descIds.has(w.id));
+      if (objProjectWork.length === 0) continue;
+
+      // committed = not explicitly bonus
+      const committed = objProjectWork.filter(w => w.chotFlag !== 'FALSE');
+      // weight = committed count; fallback to total if all are bonus
+      const weight = committed.length > 0 ? committed.length : objProjectWork.length;
+
+      weightedSum += obj.progressPct * weight;
+      totalWeight += weight;
+    }
+
+    const progressPct = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
+
+    // Counts on work items only
+    const total      = taggedWork.length;
+    const completed  = taggedWork.filter(i => i.status === 'Hoàn thành').length;
+    const inProgress = taggedWork.filter(i => i.status === 'Đang triển khai').length;
+    const notStarted = taggedWork.filter(i => i.status === 'Chưa bắt đầu').length;
+
+    return { project, total, completed, inProgress, notStarted, progressPct };
+  });
+
+  // ── Dual-track stats ───────────────────────────────────────────────────────
 
   const avgPct = (ids: string[]) => {
     if (ids.length === 0) return 0;
@@ -177,8 +223,10 @@ async function getDashboardData() {
       progressPct: i.progressPct,
       project: i.project,
       owner: i.owner,
+      chotFlag: i.chotFlag,
       startDate: i.startDate ? i.startDate.toISOString() : null,
       endDate: i.endDate ? i.endDate.toISOString() : null,
+      completedAt: i.completedAt ? i.completedAt.toISOString() : null,
       parentId: i.parentId,
     })),
     roadmapItems: allItems.map((i) => ({
@@ -189,8 +237,10 @@ async function getDashboardData() {
       project: i.project,
       status: i.status,
       owner: i.owner,
+      progressPct: i.progressPct,
       startDate: i.startDate ? i.startDate.toISOString() : null,
       endDate: i.endDate ? i.endDate.toISOString() : null,
+      completedAt: i.completedAt ? i.completedAt.toISOString() : null,
       parentId: i.parentId,
     })),
     progressTrend: (() => {

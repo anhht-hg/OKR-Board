@@ -156,6 +156,32 @@ async function collectFeatureDescendants(
 }
 
 /**
+ * Fetch the extra data needed for KR and Objective progress calculations.
+ */
+async function fetchExtraData(
+  item: { type: string; children: { id: string; type: string }[] }
+): Promise<{
+  outcomeGrandchildren?: { progressPct: number; chotFlag: string | null }[];
+  featureDescendants?: { progressPct: number; chotFlag: string | null }[];
+}> {
+  if (item.type === 'KeyResult') {
+    const featureIds = item.children.filter(c => c.type === 'Feature').map(c => c.id);
+    if (featureIds.length > 0) {
+      const outcomeGrandchildren = await prisma.okrItem.findMany({
+        where: { parentId: { in: featureIds }, type: { in: ['Adoption', 'Impact'] } },
+        select: { progressPct: true, chotFlag: true },
+      });
+      return { outcomeGrandchildren };
+    }
+  }
+  if (item.type === 'Objective') {
+    const featureDescendants = await collectFeatureDescendants(item.children);
+    return { featureDescendants };
+  }
+  return {};
+}
+
+/**
  * Recalculate a single item's progressPct and save it, then walk up the ancestor chain.
  */
 export async function recalcItem(itemId: string): Promise<void> {
@@ -165,27 +191,8 @@ export async function recalcItem(itemId: string): Promise<void> {
   });
   if (!item) return;
 
-  let outcomeGrandchildren: { progressPct: number; chotFlag: string | null }[] | undefined;
-  let featureDescendants: { progressPct: number; chotFlag: string | null }[] | undefined;
-
-  if (item.type === 'KeyResult') {
-    const featureIds = item.children.filter(c => c.type === 'Feature').map(c => c.id);
-    if (featureIds.length > 0) {
-      outcomeGrandchildren = await prisma.okrItem.findMany({
-        where: { parentId: { in: featureIds }, type: { in: ['Adoption', 'Impact'] } },
-        select: { progressPct: true, chotFlag: true },
-      });
-    }
-  }
-
-  if (item.type === 'Objective') {
-    featureDescendants = await collectFeatureDescendants(item.children);
-  }
-
-  const progress = calcItemProgress(item, item.children, {
-    outcomeGrandchildren,
-    featureDescendants,
-  });
+  const extraData = await fetchExtraData(item);
+  const progress = calcItemProgress(item, item.children, extraData);
 
   await prisma.okrItem.update({
     where: { id: item.id },
@@ -208,27 +215,8 @@ export async function recalcAncestors(itemId: string): Promise<void> {
     });
     if (!parent) break;
 
-    let outcomeGrandchildren: { progressPct: number; chotFlag: string | null }[] | undefined;
-    let featureDescendants: { progressPct: number; chotFlag: string | null }[] | undefined;
-
-    if (parent.type === 'KeyResult') {
-      const featureIds = parent.children.filter(c => c.type === 'Feature').map(c => c.id);
-      if (featureIds.length > 0) {
-        outcomeGrandchildren = await prisma.okrItem.findMany({
-          where: { parentId: { in: featureIds }, type: { in: ['Adoption', 'Impact'] } },
-          select: { progressPct: true, chotFlag: true },
-        });
-      }
-    }
-
-    if (parent.type === 'Objective') {
-      featureDescendants = await collectFeatureDescendants(parent.children);
-    }
-
-    const newPct = calcItemProgress(parent, parent.children, {
-      outcomeGrandchildren,
-      featureDescendants,
-    });
+    const extraData = await fetchExtraData(parent);
+    const newPct = calcItemProgress(parent, parent.children, extraData);
 
     await prisma.okrItem.update({
       where: { id: parent.id },
@@ -255,27 +243,8 @@ export async function recalcAllFromScratch(): Promise<void> {
     });
 
     for (const item of items) {
-      let outcomeGrandchildren: { progressPct: number; chotFlag: string | null }[] | undefined;
-      let featureDescendants: { progressPct: number; chotFlag: string | null }[] | undefined;
-
-      if (type === 'KeyResult') {
-        const featureIds = item.children.filter(c => c.type === 'Feature').map(c => c.id);
-        if (featureIds.length > 0) {
-          outcomeGrandchildren = await prisma.okrItem.findMany({
-            where: { parentId: { in: featureIds }, type: { in: ['Adoption', 'Impact'] } },
-            select: { progressPct: true, chotFlag: true },
-          });
-        }
-      }
-
-      if (type === 'Objective') {
-        featureDescendants = await collectFeatureDescendants(item.children);
-      }
-
-      const pct = calcItemProgress(item, item.children, {
-        outcomeGrandchildren,
-        featureDescendants,
-      });
+      const extraData = await fetchExtraData(item);
+      const pct = calcItemProgress(item, item.children, extraData);
 
       await prisma.okrItem.update({
         where: { id: item.id },
