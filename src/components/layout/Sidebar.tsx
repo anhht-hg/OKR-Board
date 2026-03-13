@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Target,
   LayoutGrid,
+  ClipboardList,
   LogIn,
   LogOut,
 } from 'lucide-react';
@@ -16,6 +17,7 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/objectives', label: 'OKR Tree', icon: Target },
   { href: '/okr', label: 'OKR Chi tiết', icon: LayoutGrid },
+  { href: '/action-plan', label: 'Kế hoạch tháng', icon: ClipboardList },
 ];
 
 export function Sidebar() {

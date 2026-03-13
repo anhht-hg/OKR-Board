@@ -133,6 +133,66 @@ export interface RawItem {
   parentId: string | null;
 }
 
+// ─── Action Plan types ───────────────────────────────────────────────────────
+
+export type ActionItemStatus = 'Chưa triển khai' | 'Đang làm' | 'Hoàn thành';
+
+export interface ActionItem {
+  id: string;
+  goalId: string;
+  sortOrder: number;
+  task: string;
+  expectedResult: string | null;
+  pic: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  status: ActionItemStatus;
+  budget: string | null;
+  okrLinkage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MonthlyGoal {
+  id: string;
+  planId: string;
+  sortOrder: number;
+  title: string;
+  okrLinkage: string | null;
+  expectedResult: string | null;
+  actionItems: ActionItem[];
+}
+
+export interface KpiItem {
+  id: string;
+  planId: string;
+  sortOrder: number;
+  metric: string;
+  target: string | null;
+  actual: string | null;
+  note: string | null;
+}
+
+export interface ActionPlan {
+  id: string;
+  month: number;
+  year: number;
+  title: string;
+  notes: string | null;
+  goals: MonthlyGoal[];
+  kpis: KpiItem[];
+}
+
+export interface ActionPlanSummary {
+  id: string;
+  month: number;
+  year: number;
+  title: string;
+  _count: { goals: number; kpis: number };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface DashboardStats {
   totalItems: number;
   totalObjectives: number;

@@ -6,7 +6,33 @@ Internal OKR management dashboard for the Technology & Operations team.
 
 ---
 
-## Roles
+## ✨ Features
+
+### 📊 Dashboard
+- Real-time overview of all objectives, key results, and features
+- Progress tracking with automated roll-up calculations
+- Project health grid with status visualization
+- Dual-track monitoring (strategic vs operational)
+
+### 🎯 OKR Tree
+- Hierarchical view: **Objectives → Key Results → Features**
+- Drag-and-drop reordering with `@dnd-kit`
+- Inline editing of all fields (title, status, dates, owner, etc.)
+- Completion tracking with `completedAt` timestamps
+
+### 📋 OKR Chi tiết (Detailed OKR View)
+- Spreadsheet-style detailed view of all OKR items
+- Filtering and sorting capabilities
+- Strategic pillar linkage (corporate KR connections)
+
+### 📅 Kế hoạch tháng (Monthly Action Plan) ← **NEW**
+- **Section A — Monthly Goals**: 3–5 focused objectives with OKR linkage
+- **Section B — Action Items**: Detailed task breakdown per goal with PiC, dates, status, budget, and KR linkage
+- **Section C — KPI Tracking**: Monthly KPI targets vs actuals with percentage completion
+- Multi-month plan management with tab navigation
+- Full CRUD for all sections (Admin only)
+
+### 🔐 Role-based Access
 
 | Role | Access |
 |------|--------|
@@ -17,7 +43,41 @@ Default admin credentials are set via environment variable (see below).
 
 ---
 
-## Local development
+## 🗂️ Project Structure
+
+```
+src/
+├── app/
+│   ├── page.tsx                    # Dashboard
+│   ├── objectives/                 # OKR Tree view
+│   ├── okr/                        # OKR detailed view
+│   ├── action-plan/                # Monthly Action Plan
+│   ├── login/                      # Auth page
+│   └── api/
+│       ├── items/                  # OKR CRUD endpoints
+│       ├── objectives/             # Objective tree endpoints
+│       ├── dashboard/              # Dashboard stats
+│       ├── action-plans/           # Monthly plan CRUD
+│       │   └── [planId]/
+│       │       ├── goals/          # Goal CRUD + action-items
+│       │       └── kpis/           # KPI CRUD
+│       ├── auth/                   # Login/logout/session
+│       └── search/                 # Global search
+├── components/
+│   ├── dashboard/                  # Dashboard widgets
+│   ├── objectives/                 # OKR tree nodes
+│   ├── action-plan/                # Monthly plan components
+│   ├── layout/                     # Sidebar, shell
+│   └── ui/                         # shadcn/ui primitives
+├── hooks/                          # React Query hooks
+├── lib/                            # Utilities (progress, dates, constants)
+├── context/                        # AuthContext
+└── types/                          # TypeScript interfaces
+```
+
+---
+
+## 🚀 Local Development
 
 ### 1. Install dependencies
 ```bash
@@ -32,21 +92,32 @@ cp .env.example .env
 
 ### 3. Restore the database
 ```bash
-# Restore all 189 OKR items from the committed SQL dump
+# Restore all OKR items from the committed SQL dump
 chmod +x prisma/seed/restore-db.sh
 ./prisma/seed/restore-db.sh
 ```
 
-### 4. Start dev server
+### 4. Import Monthly Action Plan data (optional)
+```bash
+# Parse and import monthly plan from Google Sheets export
+npx ts-node prisma/seed/import_monthly_plan.ts
+```
+
+### 5. Start dev server
 ```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
 
+### 6. Run tests
+```bash
+npm test
+```
+
 ---
 
-## Production deployment (VPS + PM2)
+## 🏗️ Production Deployment (VPS + PM2)
 
 ### Requirements
 - Node.js 22+
@@ -67,7 +138,6 @@ rsync -av \
 
 **2. Restore the database on the server**
 ```bash
-# After cloning — run once to create dev.db from the committed SQL dump
 chmod +x prisma/seed/restore-db.sh
 ./prisma/seed/restore-db.sh
 ```
@@ -106,7 +176,7 @@ sudo certbot --nginx -d okr.yourdomain.com
 
 ---
 
-## Production deployment (Docker)
+## 🐳 Production Deployment (Docker)
 
 ```bash
 # Build
@@ -125,8 +195,19 @@ docker run -d \
 
 ---
 
-## Database backup
+## 💾 Database
 
+### Schema Overview
+
+| Model | Description |
+|-------|-------------|
+| `OkrItem` | Hierarchical OKR items (Objective / Key Result / Feature) |
+| `ActionPlan` | Monthly action plan container |
+| `MonthlyGoal` | 3–5 focus goals per month |
+| `ActionItem` | Individual tasks linked to goals |
+| `KpiItem` | Monthly KPI metrics with target/actual tracking |
+
+### Backup
 The entire database is a single file: `dev.db`. Back it up regularly:
 
 ```bash
@@ -136,9 +217,21 @@ The entire database is a single file: `dev.db`. Back it up regularly:
 
 ---
 
-## Environment variables
+## ⚙️ Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | SQLite path, e.g. `file:./dev.db` |
 | `ADMIN_PASSWORD` | Yes | Password for `admin` login |
+
+---
+
+## 🧪 Testing
+
+```bash
+npm test                    # Run all tests
+npm run test:watch          # Watch mode
+npm run test:coverage       # Coverage report
+```
+
+Tests are located in `src/lib/__tests__/` and cover progress calculation and hierarchy logic.

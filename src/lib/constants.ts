@@ -78,6 +78,18 @@ export const NEXT_CHILD_TYPE: Record<string, string> = {
   Feature: 'UserCapability',
 };
 
+// ─── Action Plan statuses ────────────────────────────────────────────────────
+
+export const ACTION_ITEM_STATUSES = ['Chưa triển khai', 'Đang làm', 'Hoàn thành'] as const;
+
+export const ACTION_STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+  'Chưa triển khai': { bg: 'bg-gray-100',    text: 'text-gray-500',   dot: 'bg-gray-400'   },
+  'Đang làm':        { bg: 'bg-orange-100',  text: 'text-orange-700', dot: 'bg-orange-400' },
+  'Hoàn thành':      { bg: 'bg-emerald-100', text: 'text-emerald-700',dot: 'bg-emerald-500'},
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Required parent type for each child type (inverse of CHILD_TYPES)
 export const PARENT_TYPE: Record<string, string> = {
   SuccessFactor: 'Objective',

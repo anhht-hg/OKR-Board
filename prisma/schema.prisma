@@ -48,3 +48,69 @@ model OkrItem {
   parent   OkrItem?  @relation("ItemTree", fields: [parentId], references: [id], onDelete: Cascade)
   children OkrItem[] @relation("ItemTree")
 }
+
+// ─── Kế hoạch hành động (Monthly Action Plan) ────────────────────────────────
+
+model ActionPlan {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  month     Int
+  year      Int
+  title     String
+  notes     String?
+
+  goals     MonthlyGoal[]
+  kpis      KpiItem[]
+}
+
+model MonthlyGoal {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  planId         String
+  plan           ActionPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  sortOrder      Int      @default(0)
+  title          String
+  okrLinkage     String?
+  expectedResult String?
+
+  actionItems    ActionItem[]
+}
+
+model ActionItem {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  goalId         String
+  goal           MonthlyGoal  @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  sortOrder      Int      @default(0)
+  task           String
+  expectedResult String?
+  pic            String?
+  startDate      DateTime?
+  endDate        DateTime?
+  status         String   @default("Chưa triển khai")
+  budget         String?
+  okrLinkage     String?
+}
+
+model KpiItem {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  planId    String
+  plan      ActionPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  sortOrder Int      @default(0)
+  metric    String
+  target    String?
+  actual    String?
+  note      String?
+}
