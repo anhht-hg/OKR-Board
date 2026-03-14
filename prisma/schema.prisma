@@ -52,14 +52,15 @@ model OkrItem {
 // ─── Kế hoạch hành động (Monthly Action Plan) ────────────────────────────────
 
 model ActionPlan {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   month     Int
   year      Int
   title     String
   notes     String?
+  closedAt  DateTime?
 
   goals     MonthlyGoal[]
   kpis      KpiItem[]
@@ -79,6 +80,8 @@ model MonthlyGoal {
   expectedResult String?
 
   actionItems    ActionItem[]
+
+  @@index([planId])
 }
 
 model ActionItem {
@@ -98,6 +101,8 @@ model ActionItem {
   status         String   @default("Chưa triển khai")
   budget         String?
   okrLinkage     String?
+
+  @@index([goalId])
 }
 
 model KpiItem {
@@ -113,4 +118,6 @@ model KpiItem {
   target    String?
   actual    String?
   note      String?
+
+  @@index([planId])
 }

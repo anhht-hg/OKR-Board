@@ -1,8 +1,9 @@
 'use client';
 
-import { Fragment, useState } from 'react';
-import { Plus, Trash2, Pencil, Check, X } from 'lucide-react';
-import { useActionPlan, useCreateGoal, useUpdateGoal, useDeleteGoal, useCreateActionItem, useUpdateActionItem, useDeleteActionItem, useCreateKpi, useUpdateKpi, useDeleteKpi } from '@/hooks/useActionPlan';
+import { Fragment, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Plus, Trash2, Pencil, Check, X, CheckCircle2 } from 'lucide-react';
+import { useActionPlan, useCreateGoal, useUpdateGoal, useDeleteGoal, useCreateActionItem, useUpdateActionItem, useDeleteActionItem } from '@/hooks/useActionPlan';
 import { ACTION_STATUS_COLORS, ACTION_ITEM_STATUSES } from '@/lib/constants';
 import { useAuth } from '@/context/AuthContext';
 import { ActionItem, MonthlyGoal } from '@/types';
@@ -61,37 +62,84 @@ function EditableCell({
   );
 }
 
+// ─── Row style by status ─────────────────────────────────────────────────────
+
+const ROW_STATUS_STYLE: Record<string, { border: string; bg: string }> = {
+  'Hoàn thành':      { border: 'border-l-2 border-l-emerald-400', bg: 'bg-emerald-50/40' },
+  'Đang làm':        { border: 'border-l-2 border-l-orange-400',  bg: 'bg-orange-50/40'  },
+  'Chưa triển khai': { border: 'border-l-2 border-l-transparent', bg: ''                 },
+};
+
 // ─── Status selector ─────────────────────────────────────────────────────────
+
+const STATUS_BADGE: Record<string, string> = {
+  'Chưa triển khai': 'bg-gray-100 text-gray-500 border border-gray-200',
+  'Đang làm':        'bg-orange-100 text-orange-700 border border-orange-200',
+  'Hoàn thành':      'bg-emerald-100 text-emerald-700 border border-emerald-200',
+};
 
 function StatusCell({ status, onSave }: { status: string; onSave: (s: string) => void }) {
   const { isAdmin } = useAuth();
   const [open, setOpen] = useState(false);
-  const s = ACTION_STATUS_COLORS[status] ?? ACTION_STATUS_COLORS['Chưa triển khai'];
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const badgeCls = STATUS_BADGE[status] ?? STATUS_BADGE['Chưa triển khai'];
+  const dot = ACTION_STATUS_COLORS[status]?.dot ?? 'bg-gray-400';
+
+  // Close on click outside both button and dropdown
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        btnRef.current?.contains(target) ||
+        dropdownRef.current?.contains(target)
+      ) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
 
   if (!isAdmin) {
     return (
-      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.bg} ${s.text}`}>
+      <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${badgeCls}`}>
+        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
         {status}
       </span>
     );
   }
 
+  function handleOpen() {
+    if (!btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    setDropdownPos({ top: rect.bottom + 4, left: rect.left });
+    setOpen(o => !o);
+  }
+
   return (
     <div className="relative">
       <button
-        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.bg} ${s.text} cursor-pointer hover:opacity-80 transition-opacity`}
-        onClick={() => setOpen(o => !o)}
+        ref={btnRef}
+        className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${badgeCls} hover:opacity-80 transition-opacity`}
+        onClick={handleOpen}
       >
+        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
         {status}
       </button>
-      {open && (
-        <div className="absolute z-10 top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden min-w-[140px]">
+      {open && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed z-[9999] bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden min-w-[150px]"
+          style={{ top: dropdownPos.top, left: dropdownPos.left }}
+        >
           {ACTION_ITEM_STATUSES.map(st => {
             const sc = ACTION_STATUS_COLORS[st];
             return (
               <button
                 key={st}
-                className="w-full text-left text-xs px-3 py-2 hover:bg-gray-50 flex items-center gap-2"
+                className="w-full text-left text-xs px-3 py-2.5 hover:bg-gray-50 flex items-center gap-2.5"
                 onClick={() => { onSave(st); setOpen(false); }}
               >
                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${sc.dot}`} />
@@ -99,7 +147,8 @@ function StatusCell({ status, onSave }: { status: string; onSave: (s: string) =>
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -208,21 +257,30 @@ function ActionItemRow({ item, planId, index }: { item: ActionItem; planId: stri
   const updateItem = useUpdateActionItem(planId);
   const deleteItem = useDeleteActionItem(planId);
 
+  const isDone = item.status === 'Hoàn thành';
+  const rowStyle = ROW_STATUS_STYLE[item.status] ?? ROW_STATUS_STYLE['Chưa triển khai'];
+  const fadedText = isDone ? 'text-gray-400 line-through' : '';
+
   function save(field: string, value: string) {
     updateItem.mutate({ itemId: item.id, data: { [field]: value } });
   }
 
   return (
-    <tr className="group hover:bg-gray-50 border-b border-gray-100 last:border-0">
+    <tr className={`group border-b border-gray-100 last:border-0 transition-colors hover:brightness-95 ${rowStyle.border} ${rowStyle.bg}`}>
       <td className="px-3 py-2.5 text-xs text-gray-400 w-8 text-center">{index}</td>
       <td className="px-3 py-2.5 text-xs max-w-[200px]">
-        <EditableCell value={item.task} onSave={v => save('task', v)} placeholder="Công việc..." className="text-xs text-gray-800 font-medium" />
+        <EditableCell
+          value={item.task}
+          onSave={v => save('task', v)}
+          placeholder="Công việc..."
+          className={`text-xs font-medium ${isDone ? 'text-gray-400 line-through' : 'text-gray-800'}`}
+        />
       </td>
       <td className="px-3 py-2.5 text-xs max-w-[180px]">
-        <EditableCell value={item.expectedResult ?? ''} onSave={v => save('expectedResult', v)} placeholder="Kết quả mong đợi..." className="text-xs text-gray-600" />
+        <EditableCell value={item.expectedResult ?? ''} onSave={v => save('expectedResult', v)} placeholder="Kết quả mong đợi..." className={`text-xs ${isDone ? 'text-gray-300' : 'text-gray-600'}`} />
       </td>
       <td className="px-3 py-2.5 text-xs w-28">
-        <EditableCell value={item.pic ?? ''} onSave={v => save('pic', v)} placeholder="Người phụ trách" className="text-xs text-gray-700 font-medium" />
+        <EditableCell value={item.pic ?? ''} onSave={v => save('pic', v)} placeholder="Người phụ trách" className={`text-xs font-medium ${isDone ? 'text-gray-400' : 'text-gray-700'}`} />
       </td>
       <td className="px-3 py-2.5 text-xs w-24">
         <EditableCell
@@ -230,7 +288,7 @@ function ActionItemRow({ item, planId, index }: { item: ActionItem; planId: stri
           onSave={v => save('startDate', v)}
           type="date"
           placeholder="—"
-          className="text-xs text-gray-500 tabular-nums"
+          className={`text-xs tabular-nums ${isDone ? 'text-gray-300' : 'text-gray-500'}`}
         />
       </td>
       <td className="px-3 py-2.5 text-xs w-24">
@@ -239,17 +297,17 @@ function ActionItemRow({ item, planId, index }: { item: ActionItem; planId: stri
           onSave={v => save('endDate', v)}
           type="date"
           placeholder="—"
-          className="text-xs text-gray-500 tabular-nums"
+          className={`text-xs tabular-nums ${isDone ? 'text-gray-300' : 'text-gray-500'}`}
         />
       </td>
-      <td className="px-3 py-2.5 w-32">
+      <td className="px-3 py-2.5 w-36">
         <StatusCell status={item.status} onSave={v => save('status', v)} />
       </td>
       <td className="px-3 py-2.5 text-xs w-28">
-        <EditableCell value={item.budget ?? ''} onSave={v => save('budget', v)} placeholder="Ngân sách..." className="text-xs text-gray-500" />
+        <EditableCell value={item.budget ?? ''} onSave={v => save('budget', v)} placeholder="Ngân sách..." className={`text-xs ${isDone ? 'text-gray-300' : 'text-gray-500'}`} />
       </td>
       <td className="px-3 py-2.5 text-xs w-28">
-        <EditableCell value={item.okrLinkage ?? ''} onSave={v => save('okrLinkage', v)} placeholder="O1 - KR 1" className="text-xs text-blue-600" />
+        <EditableCell value={item.okrLinkage ?? ''} onSave={v => save('okrLinkage', v)} placeholder="O1 - KR 1" className={`text-xs ${isDone ? 'text-gray-400' : 'text-blue-600'}`} />
       </td>
       {isAdmin && (
         <td className="px-2 py-2.5 w-10">
@@ -270,14 +328,14 @@ function ActionItemRow({ item, planId, index }: { item: ActionItem; planId: stri
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+const GOALS_VISIBLE_DEFAULT = 3;
+
 export function ActionPlanDetail({ planId }: Props) {
   const { data: plan, isLoading } = useActionPlan(planId);
   const { isAdmin } = useAuth();
   const createGoal = useCreateGoal(planId);
   const createItem = useCreateActionItem(planId);
-  const createKpi = useCreateKpi(planId);
-  const updateKpi = useUpdateKpi(planId);
-  const deleteKpi = useDeleteKpi(planId);
+  const [showAllGoals, setShowAllGoals] = useState(false);
 
   if (isLoading) {
     return (
@@ -287,6 +345,8 @@ export function ActionPlanDetail({ planId }: Props) {
     );
   }
   if (!plan) return null;
+
+  const isClosed = !!plan.closedAt;
 
   // Stats
   const allItems = plan.goals.flatMap(g => g.actionItems);
@@ -298,15 +358,28 @@ export function ActionPlanDetail({ planId }: Props) {
 
   return (
     <div className="space-y-8">
+      {/* Closed banner */}
+      {isClosed && (
+        <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700">
+          <CheckCircle2 size={16} className="shrink-0 text-emerald-500" />
+          <div>
+            <span className="text-sm font-semibold">Tháng này đã kết thúc</span>
+            <span className="text-xs text-emerald-600 ml-2">
+              — Kết thúc lúc {new Date(plan.closedAt!).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Header stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Tổng công việc', value: total, color: 'text-gray-800' },
-          { label: 'Chưa triển khai', value: notStarted, color: 'text-gray-500' },
-          { label: 'Đang làm', value: inProgress, color: 'text-orange-600' },
-          { label: 'Hoàn thành', value: done, color: 'text-emerald-600' },
+          { label: 'Tổng công việc', value: total,      color: 'text-gray-800',    bar: 'bg-gray-300',     accent: 'border-l-gray-300'    },
+          { label: 'Chưa triển khai', value: notStarted, color: 'text-gray-500',   bar: 'bg-gray-300',     accent: 'border-l-gray-300'    },
+          { label: 'Đang làm',        value: inProgress, color: 'text-orange-600', bar: 'bg-orange-400',   accent: 'border-l-orange-400'  },
+          { label: 'Hoàn thành',      value: done,       color: 'text-emerald-600',bar: 'bg-emerald-400',  accent: 'border-l-emerald-400' },
         ].map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <div key={s.label} className={`bg-white rounded-xl border border-gray-100 border-l-4 ${s.accent} shadow-sm p-4`}>
             <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wide mb-1">{s.label}</p>
             <p className={`text-3xl font-bold ${s.color}`}>{s.value}</p>
           </div>
@@ -317,15 +390,18 @@ export function ActionPlanDetail({ planId }: Props) {
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-semibold text-gray-700">Tiến độ tổng thể</span>
-          <span className="text-sm font-bold text-blue-600">{pct}%</span>
+          <span className="text-sm font-bold text-emerald-600">{pct}%</span>
         </div>
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full bg-blue-600 transition-all duration-500"
-            style={{ width: `${pct}%` }}
-          />
+        {/* Stacked bar: done (green) + in-progress (orange) + rest (gray) */}
+        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden flex">
+          <div className="h-full bg-emerald-400 transition-all duration-500" style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }} />
+          <div className="h-full bg-orange-300 transition-all duration-500" style={{ width: `${total > 0 ? (inProgress / total) * 100 : 0}%` }} />
         </div>
-        <p className="text-xs text-gray-400 mt-1.5">{done} / {total} công việc hoàn thành</p>
+        <div className="flex items-center gap-4 mt-2">
+          <span className="text-xs text-gray-400">{done} / {total} hoàn thành</span>
+          {inProgress > 0 && <span className="text-xs text-orange-500 font-medium">{inProgress} đang làm</span>}
+          {notStarted > 0 && <span className="text-xs text-gray-400">{notStarted} chưa bắt đầu</span>}
+        </div>
       </div>
 
       {/* ── Section A: Monthly Focus Objectives ── */}
@@ -335,7 +411,7 @@ export function ActionPlanDetail({ planId }: Props) {
             <h3 className="text-sm font-bold text-gray-800">A. Mục tiêu trọng tâm tháng</h3>
             <p className="text-xs text-gray-400 mt-0.5">3 – 5 mục tiêu định hướng hành động trong tháng</p>
           </div>
-          {isAdmin && (
+          {isAdmin && !isClosed && (
             <button
               onClick={() => createGoal.mutate({ title: 'Mục tiêu mới' })}
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
@@ -348,9 +424,20 @@ export function ActionPlanDetail({ planId }: Props) {
           {plan.goals.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-6">Chưa có mục tiêu trọng tâm. {isAdmin && 'Nhấn "Thêm mục tiêu" để bắt đầu.'}</p>
           )}
-          {plan.goals.map((goal, i) => (
+          {(showAllGoals ? plan.goals : plan.goals.slice(0, GOALS_VISIBLE_DEFAULT)).map((goal, i) => (
             <GoalSection key={goal.id} goal={goal} planId={planId} goalIndex={i} />
           ))}
+          {plan.goals.length > GOALS_VISIBLE_DEFAULT && (
+            <button
+              onClick={() => setShowAllGoals(v => !v)}
+              className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-blue-500 hover:text-blue-700 transition-colors rounded-lg hover:bg-blue-50"
+            >
+              {showAllGoals
+                ? `Ẩn bớt`
+                : `Xem thêm ${plan.goals.length - GOALS_VISIBLE_DEFAULT} mục tiêu`}
+              <svg className={`w-3.5 h-3.5 transition-transform ${showAllGoals ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -381,15 +468,42 @@ export function ActionPlanDetail({ planId }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {plan.goals.map((goal) => (
+                {plan.goals.map((goal) => {
+                  const goalDone = goal.actionItems.filter(i => i.status === 'Hoàn thành').length;
+                  const goalInProgress = goal.actionItems.filter(i => i.status === 'Đang làm').length;
+                  const goalTotal = goal.actionItems.length;
+                  const goalPct = goalTotal > 0 ? Math.round((goalDone / goalTotal) * 100) : 0;
+
+                  return (
                   <Fragment key={goal.id}>
                     {/* Goal sub-header row */}
-                    <tr className="bg-blue-50/60">
-                      <td colSpan={isAdmin ? 10 : 9} className="px-4 py-2">
-                        <span className="text-[11px] font-bold text-blue-700">{goal.title}</span>
-                        {goal.okrLinkage && (
-                          <span className="ml-2 text-[10px] text-blue-400">({goal.okrLinkage})</span>
-                        )}
+                    <tr className="bg-indigo-50 border-t-2 border-t-indigo-100">
+                      <td colSpan={isAdmin ? 10 : 9} className="px-4 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-1 h-4 rounded-full bg-indigo-400 flex-shrink-0" />
+                          <span className="text-xs font-bold text-indigo-800">{goal.title}</span>
+                          {goal.okrLinkage && (
+                            <span className="text-[10px] bg-indigo-100 text-indigo-500 px-2 py-0.5 rounded-full font-medium">{goal.okrLinkage}</span>
+                          )}
+                          <div className="ml-auto flex items-center gap-2">
+                            {goalTotal > 0 && (
+                              <>
+                                <div className="flex items-center gap-1 text-[10px] text-indigo-400 font-medium">
+                                  <span className="text-emerald-600 font-bold">{goalDone}</span>
+                                  {goalInProgress > 0 && <span className="text-orange-500 font-bold">/ {goalInProgress} đang làm</span>}
+                                  <span>/ {goalTotal}</span>
+                                </div>
+                                <div className="w-20 h-1.5 bg-indigo-100 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full bg-emerald-400 transition-all duration-300"
+                                    style={{ width: `${goalPct}%` }}
+                                  />
+                                </div>
+                                <span className="text-[10px] font-bold text-indigo-500">{goalPct}%</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </td>
                     </tr>
                     {/* Action item rows */}
@@ -397,7 +511,7 @@ export function ActionPlanDetail({ planId }: Props) {
                       <ActionItemRow key={item.id} item={item} planId={planId} index={idx + 1} />
                     ))}
                     {/* Add row button */}
-                    {isAdmin && (
+                    {isAdmin && !isClosed && (
                       <tr className="border-b border-gray-100">
                         <td colSpan={isAdmin ? 10 : 9} className="px-4 py-1.5">
                           <button
@@ -410,103 +524,14 @@ export function ActionPlanDetail({ planId }: Props) {
                       </tr>
                     )}
                   </Fragment>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* ── Section C: KPI Tracking ── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <div>
-            <h3 className="text-sm font-bold text-gray-800">C. Theo dõi tiến độ KPI</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Các chỉ số và mục tiêu cần đạt trong tháng</p>
-          </div>
-          {isAdmin && (
-            <button
-              onClick={() => createKpi.mutate({ metric: 'Chỉ số mới' })}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-            >
-              <Plus size={13} /> Thêm chỉ số
-            </button>
-          )}
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wide w-8">#</th>
-                <th className="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wide">Chỉ số</th>
-                <th className="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wide w-32">Mục tiêu</th>
-                <th className="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wide w-32">Thực tế</th>
-                <th className="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wide w-20">%</th>
-                <th className="px-4 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wide">Ghi chú</th>
-                {isAdmin && <th className="w-10" />}
-              </tr>
-            </thead>
-            <tbody>
-              {plan.kpis.length === 0 && (
-                <tr>
-                  <td colSpan={isAdmin ? 7 : 6} className="px-4 py-8 text-sm text-gray-400 text-center">
-                    Chưa có chỉ số KPI. {isAdmin && 'Nhấn "Thêm chỉ số" để bắt đầu.'}
-                  </td>
-                </tr>
-              )}
-              {plan.kpis.map((kpi, idx) => {
-                const pctKpi = (() => {
-                  const t = parseFloat(kpi.target ?? '');
-                  const a = parseFloat(kpi.actual ?? '');
-                  if (isNaN(t) || isNaN(a) || t === 0) return null;
-                  return Math.round((a / t) * 100);
-                })();
-
-                return (
-                  <tr key={kpi.id} className="group border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                    <td className="px-4 py-2.5 text-xs text-gray-400 text-center">{idx + 1}</td>
-                    <td className="px-4 py-2.5 text-xs">
-                      <EditableCell value={kpi.metric} onSave={v => updateKpi.mutate({ kpiId: kpi.id, data: { metric: v } })} className="text-xs text-gray-800 font-medium" />
-                    </td>
-                    <td className="px-4 py-2.5 text-xs">
-                      <EditableCell value={kpi.target ?? ''} onSave={v => updateKpi.mutate({ kpiId: kpi.id, data: { target: v } })} placeholder="Mục tiêu" className="text-xs text-gray-600 tabular-nums" />
-                    </td>
-                    <td className="px-4 py-2.5 text-xs">
-                      <EditableCell value={kpi.actual ?? ''} onSave={v => updateKpi.mutate({ kpiId: kpi.id, data: { actual: v } })} placeholder="Thực tế" className="text-xs text-gray-600 tabular-nums" />
-                    </td>
-                    <td className="px-4 py-2.5 text-xs w-20">
-                      {pctKpi !== null ? (
-                        <span className={`text-xs font-bold tabular-nums ${pctKpi >= 100 ? 'text-emerald-600' : pctKpi >= 70 ? 'text-orange-500' : 'text-red-500'}`}>
-                          {pctKpi}%
-                        </span>
-                      ) : (
-                        <span className="text-gray-300 text-xs">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs">
-                      <EditableCell value={kpi.note ?? ''} onSave={v => updateKpi.mutate({ kpiId: kpi.id, data: { note: v } })} placeholder="Ghi chú..." className="text-xs text-gray-500" />
-                    </td>
-                    {isAdmin && (
-                      <td className="px-2 py-2.5 w-10">
-                        <button
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-500"
-                          onClick={() => {
-                            if (!confirm(`Xóa chỉ số "${kpi.metric}"?`)) return;
-                            deleteKpi.mutate(kpi.id);
-                          }}
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }

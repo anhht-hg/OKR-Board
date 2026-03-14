@@ -11,7 +11,10 @@ export function useActionPlans() {
 export function useActionPlan(planId: string | null) {
   return useQuery<ActionPlan>({
     queryKey: ['action-plan', planId],
-    queryFn: () => fetch(`/api/action-plans/${planId}`).then(r => r.json()),
+    queryFn: () => {
+      if (!planId) throw new Error('planId is required');
+      return fetch(`/api/action-plans/${planId}`).then(r => r.json());
+    },
     enabled: !!planId,
   });
 }
@@ -42,6 +45,19 @@ export function useDeleteActionPlan() {
   });
 }
 
+export function useClosePlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (planId: string) =>
+      fetch(`/api/action-plans/${planId}/close`, { method: 'POST' }).then(async r => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? 'Lỗi kết thúc tháng');
+        return json as { rolledOver: number; nextPlanId: string };
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['action-plans'] }),
+  });
+}
+
 export function useCreateGoal(planId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -67,7 +83,11 @@ export function useUpdateGoal(planId: string) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-      }).then(r => r.json()),
+      }).then(async r => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? 'Lỗi cập nhật mục tiêu');
+        return json;
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['action-plan', planId] }),
   });
 }
@@ -76,7 +96,11 @@ export function useDeleteGoal(planId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (goalId: string) =>
-      fetch(`/api/action-plans/${planId}/goals/${goalId}`, { method: 'DELETE' }).then(r => r.json()),
+      fetch(`/api/action-plans/${planId}/goals/${goalId}`, { method: 'DELETE' }).then(async r => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? 'Lỗi xóa mục tiêu');
+        return json;
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['action-plan', planId] }),
   });
 }
@@ -106,7 +130,11 @@ export function useUpdateActionItem(planId: string) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-      }).then(r => r.json()),
+      }).then(async r => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? 'Lỗi cập nhật công việc');
+        return json;
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['action-plan', planId] }),
   });
 }
@@ -115,7 +143,11 @@ export function useDeleteActionItem(planId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (itemId: string) =>
-      fetch(`/api/action-plans/${planId}/action-items/${itemId}`, { method: 'DELETE' }).then(r => r.json()),
+      fetch(`/api/action-plans/${planId}/action-items/${itemId}`, { method: 'DELETE' }).then(async r => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? 'Lỗi xóa công việc');
+        return json;
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['action-plan', planId] }),
   });
 }
@@ -145,7 +177,11 @@ export function useUpdateKpi(planId: string) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-      }).then(r => r.json()),
+      }).then(async r => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? 'Lỗi cập nhật KPI');
+        return json;
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['action-plan', planId] }),
   });
 }
@@ -154,7 +190,11 @@ export function useDeleteKpi(planId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (kpiId: string) =>
-      fetch(`/api/action-plans/${planId}/kpis/${kpiId}`, { method: 'DELETE' }).then(r => r.json()),
+      fetch(`/api/action-plans/${planId}/kpis/${kpiId}`, { method: 'DELETE' }).then(async r => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? 'Lỗi xóa KPI');
+        return json;
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['action-plan', planId] }),
   });
 }

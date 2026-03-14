@@ -179,6 +179,7 @@ export interface ActionPlan {
   year: number;
   title: string;
   notes: string | null;
+  closedAt: string | null;
   goals: MonthlyGoal[];
   kpis: KpiItem[];
 }
@@ -188,6 +189,7 @@ export interface ActionPlanSummary {
   month: number;
   year: number;
   title: string;
+  closedAt: string | null;
   _count: { goals: number; kpis: number };
 }
 

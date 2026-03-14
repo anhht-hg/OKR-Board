@@ -10,13 +10,21 @@ async function requireAdmin() {
   return null;
 }
 
-type Params = { params: Promise<{ itemId: string }> };
+type Params = { params: Promise<{ planId: string; itemId: string }> };
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
-  const { itemId } = await params;
+  const { planId, itemId } = await params;
+  const existing = await prisma.actionItem.findUnique({
+    where: { id: itemId },
+    select: { goal: { select: { planId: true } } },
+  });
+  if (!existing || existing.goal.planId !== planId) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const body = await req.json();
   const { task, expectedResult, pic, startDate, endDate, status, budget, okrLinkage } = body;
 
@@ -40,7 +48,15 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
-  const { itemId } = await params;
+  const { planId, itemId } = await params;
+  const existing = await prisma.actionItem.findUnique({
+    where: { id: itemId },
+    select: { goal: { select: { planId: true } } },
+  });
+  if (!existing || existing.goal.planId !== planId) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   await prisma.actionItem.delete({ where: { id: itemId } });
   return NextResponse.json({ ok: true });
 }

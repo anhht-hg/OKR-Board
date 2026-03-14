@@ -10,13 +10,18 @@ async function requireAdmin() {
   return null;
 }
 
-type Params = { params: Promise<{ goalId: string }> };
+type Params = { params: Promise<{ planId: string; goalId: string }> };
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
-  const { goalId } = await params;
+  const { planId, goalId } = await params;
+  const existing = await prisma.monthlyGoal.findUnique({ where: { id: goalId }, select: { planId: true } });
+  if (!existing || existing.planId !== planId) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const { title, okrLinkage, expectedResult, sortOrder } = await req.json();
 
   const goal = await prisma.monthlyGoal.update({
@@ -36,7 +41,12 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
-  const { goalId } = await params;
+  const { planId, goalId } = await params;
+  const existing = await prisma.monthlyGoal.findUnique({ where: { id: goalId }, select: { planId: true } });
+  if (!existing || existing.planId !== planId) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   await prisma.monthlyGoal.delete({ where: { id: goalId } });
   return NextResponse.json({ ok: true });
 }

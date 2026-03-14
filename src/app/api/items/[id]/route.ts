@@ -20,8 +20,9 @@ async function wouldCreateCycle(itemId: string, newParentId: string): Promise<bo
   return false;
 }
 
-/** Recursively cascade chotFlag to all descendants */
-async function cascadeChotFlag(parentId: string, flag: string): Promise<void> {
+/** Recursively cascade chotFlag to all descendants (max 50 levels deep) */
+async function cascadeChotFlag(parentId: string, flag: string, depth = 0): Promise<void> {
+  if (depth > 50) return;
   const children = await prisma.okrItem.findMany({
     where: { parentId },
     select: { id: true },
@@ -31,7 +32,7 @@ async function cascadeChotFlag(parentId: string, flag: string): Promise<void> {
     where: { parentId },
     data: { chotFlag: flag },
   });
-  await Promise.all(children.map(c => cascadeChotFlag(c.id, flag)));
+  await Promise.all(children.map(c => cascadeChotFlag(c.id, flag, depth + 1)));
 }
 
 /** Check if changing an item's type to `newType` is valid given its parent and children. */
@@ -140,7 +141,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   } = body;
 
   // Capture old parentId before update (needed for re-calc if parent changes)
-  const existing = await prisma.okrItem.findUnique({ where: { id }, select: { parentId: true } });
+  const existing = await prisma.okrItem.findUnique({ where: { id }, select: { parentId: true, status: true } });
   const oldParentId = existing?.parentId ?? null;
 
   // Validate type change: must be compatible with parent and children
@@ -155,9 +156,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (status !== undefined) {
     updateData.status = status;
     updateData.progressPct = STATUS_WEIGHT[status as string] ?? 0;
-    if (status === 'Hoàn thành') {
+    // Only set completedAt on first transition to Hoàn thành, never overwrite
+    if (status === 'Hoàn thành' && existing?.status !== 'Hoàn thành') {
       updateData.completedAt = new Date();
-    } else {
+    } else if (status !== 'Hoàn thành') {
       updateData.completedAt = null;
     }
   }
@@ -166,7 +168,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
   if (owner !== undefined) updateData.owner = owner;
   if (stakeholder !== undefined) updateData.stakeholder = stakeholder;
-  if (chotFlag !== undefined) updateData.chotFlag = chotFlag;
+  if (chotFlag !== undefined) {
+    if (chotFlag !== null && chotFlag !== 'TRUE' && chotFlag !== 'FALSE') {
+      return NextResponse.json({ error: 'chotFlag chỉ chấp nhận null, "TRUE", hoặc "FALSE".' }, { status: 400 });
+    }
+    updateData.chotFlag = chotFlag;
+  }
   if (code !== undefined) updateData.code = code;
   if (notes !== undefined) updateData.notes = notes;
   if (description !== undefined) updateData.description = description;
