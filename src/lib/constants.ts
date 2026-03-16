@@ -90,6 +90,32 @@ export const ACTION_STATUS_COLORS: Record<string, { bg: string; text: string; do
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Human-readable audit log field labels (Vietnamese)
+export const AUDIT_FIELD_LABELS: Record<string, string> = {
+  title: 'Tên',
+  type: 'Loại',
+  status: 'Trạng thái',
+  project: 'Dự án',
+  owner: 'Người phụ trách',
+  stakeholder: 'Stakeholder',
+  startDate: 'Ngày bắt đầu',
+  endDate: 'Ngày kết thúc',
+  chotFlag: 'Chốt',
+  code: 'Mã',
+  notes: 'Ghi chú',
+  description: 'Mô tả',
+  successMetric: 'Chỉ số thành công',
+  targetValue: 'Giá trị mục tiêu',
+  measureFormula: 'Công thức đo',
+  corporateKRLinkage: 'Liên kết KR công ty',
+  strategicPillar: 'Trụ cột chiến lược',
+  deadline: 'Deadline',
+  pic: 'PIC',
+  scope: 'Phạm vi',
+  parentId: 'Item cha',
+  progressPct: 'Tiến độ (%)',
+};
+
 // Required parent type for each child type (inverse of CHILD_TYPES)
 export const PARENT_TYPE: Record<string, string> = {
   SuccessFactor: 'Objective',

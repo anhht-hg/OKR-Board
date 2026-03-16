@@ -2,6 +2,7 @@
 
 import { ReactNode, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { OkrItem } from '@/types';
 import { TYPE_COLORS, TYPE_LABELS, STATUS_DOT } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +30,7 @@ interface Props {
 export function FeatureNode({ item, depth = 0, onItemClick, dragHandle }: Props) {
   const [expanded, setExpanded] = useState(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
   const { compact } = useTreeContext();
   const hasChildren = item.children && item.children.length > 0;
@@ -98,7 +100,7 @@ export function FeatureNode({ item, depth = 0, onItemClick, dragHandle }: Props)
                 e.stopPropagation();
                 if (!confirm(`Xóa "${item.title}"?\nHành động này không thể hoàn tác.`)) return;
                 const res = await fetch(`/api/items/${item.id}`, { method: 'DELETE' });
-                if (res.ok) router.refresh();
+                if (res.ok) { queryClient.invalidateQueries({ queryKey: ['objectives'] }); router.refresh(); }
               }}
             >
               <Trash2 size={11} /> Xóa

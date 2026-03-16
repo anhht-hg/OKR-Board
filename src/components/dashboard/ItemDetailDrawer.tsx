@@ -390,7 +390,9 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
         fetch(`/api/items/${id}/ancestors`),
       ]);
       if (!itemRes.ok) {
-        console.error('Failed to load item:', itemRes.status);
+        if (itemRes.status === 404) {
+          onOpenChange(false);
+        }
         setItem(null);
         setAncestors([]);
         return;
@@ -406,7 +408,7 @@ export function ItemDetailDrawer({ itemId, open, onOpenChange, onAddChild }: Pro
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onOpenChange]);
 
   useEffect(() => {
     if (itemId && open) {

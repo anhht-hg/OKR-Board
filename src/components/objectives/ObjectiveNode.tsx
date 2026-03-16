@@ -114,6 +114,7 @@ function SortableChildrenGroup({ items: initialItems, onItemClick }: { items: Ok
 function SuccessFactorNode({ item, onItemClick, dragHandle }: { item: OkrItem; onItemClick: (id: string) => void; dragHandle?: ReactNode }) {
   const [expanded, setExpanded] = useState(true);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
   const { compact } = useTreeContext();
   const hasChildren = item.children && item.children.length > 0;
@@ -156,7 +157,7 @@ function SuccessFactorNode({ item, onItemClick, dragHandle }: { item: OkrItem; o
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ status: nextStatus(item.status) }),
                 });
-                if (res.ok) router.refresh();
+                if (res.ok) { queryClient.invalidateQueries({ queryKey: ['objectives'] }); router.refresh(); }
               }}
             />
           ) : (
@@ -170,7 +171,7 @@ function SuccessFactorNode({ item, onItemClick, dragHandle }: { item: OkrItem; o
                 e.stopPropagation();
                 if (!confirm(`Xóa "${item.title}"?\nHành động này không thể hoàn tác.`)) return;
                 const res = await fetch(`/api/items/${item.id}`, { method: 'DELETE' });
-                if (res.ok) router.refresh();
+                if (res.ok) { queryClient.invalidateQueries({ queryKey: ['objectives'] }); router.refresh(); }
               }}
             >
               <Trash2 size={11} /> Xóa
@@ -203,6 +204,7 @@ function SuccessFactorNode({ item, onItemClick, dragHandle }: { item: OkrItem; o
 export function ObjectiveNode({ objective, onItemClick = () => {} }: Props) {
   const [expanded, setExpanded] = useState(true);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
   const { compact } = useTreeContext();
   const hasChildren = objective.children && objective.children.length > 0;
@@ -248,7 +250,7 @@ export function ObjectiveNode({ objective, onItemClick = () => {} }: Props) {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ status: nextStatus(objective.status) }),
                 });
-                if (res.ok) router.refresh();
+                if (res.ok) { queryClient.invalidateQueries({ queryKey: ['objectives'] }); router.refresh(); }
               }}
             />
           ) : (
@@ -267,7 +269,7 @@ export function ObjectiveNode({ objective, onItemClick = () => {} }: Props) {
                 e.stopPropagation();
                 if (!confirm(`Xóa mục tiêu "${objective.title}"?\nTất cả dữ liệu con sẽ bị xóa. Hành động này không thể hoàn tác.`)) return;
                 const res = await fetch(`/api/items/${objective.id}`, { method: 'DELETE' });
-                if (res.ok) router.refresh();
+                if (res.ok) { queryClient.invalidateQueries({ queryKey: ['objectives'] }); router.refresh(); }
               }}
             >
               <Trash2 size={11} /> Xóa

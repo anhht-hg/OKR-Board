@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
 import { recalcItem, recalcAncestors } from '@/lib/progress';
 import { STATUS_WEIGHT, CHILD_TYPES } from '@/lib/constants';
+import { logFieldChange, logDeleted } from '@/lib/audit';
 
 /** Walk up the ancestor chain to check if `ancestorId` is a descendant of `itemId`.
  *  Returns true if setting parentId would create a cycle. */
@@ -140,8 +141,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     parentId,
   } = body;
 
-  // Capture old parentId before update (needed for re-calc if parent changes)
-  const existing = await prisma.okrItem.findUnique({ where: { id }, select: { parentId: true, status: true } });
+  // Capture existing values before update (for progress recalc + audit log)
+  const existing = await prisma.okrItem.findUnique({
+    where: { id },
+    select: {
+      parentId: true, status: true, title: true, type: true, code: true,
+      project: true, owner: true, stakeholder: true, startDate: true, endDate: true,
+      chotFlag: true, notes: true, description: true, successMetric: true,
+      targetValue: true, measureFormula: true, corporateKRLinkage: true,
+      strategicPillar: true, deadline: true, pic: true, scope: true,
+    },
+  });
   const oldParentId = existing?.parentId ?? null;
 
   // Validate type change: must be compatible with parent and children
@@ -199,6 +209,39 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     data: updateData,
   });
 
+  // Audit log — record each changed field
+  if (existing) {
+    const itemMeta = { id: item.id, title: item.title, type: item.type, code: item.code };
+    const auditFields: Array<[string, unknown, unknown]> = [
+      ['title', existing.title, title],
+      ['type', existing.type, type],
+      ['status', existing.status, status],
+      ['project', existing.project, project],
+      ['owner', existing.owner, owner],
+      ['stakeholder', existing.stakeholder, stakeholder],
+      ['startDate', existing.startDate, startDate !== undefined ? (startDate ? new Date(startDate) : null) : undefined],
+      ['endDate', existing.endDate, endDate !== undefined ? (endDate ? new Date(endDate) : null) : undefined],
+      ['chotFlag', existing.chotFlag, chotFlag],
+      ['code', existing.code, code],
+      ['notes', existing.notes, notes],
+      ['description', existing.description, description],
+      ['successMetric', existing.successMetric, successMetric],
+      ['targetValue', existing.targetValue, targetValue],
+      ['measureFormula', existing.measureFormula, measureFormula],
+      ['corporateKRLinkage', existing.corporateKRLinkage, corporateKRLinkage],
+      ['strategicPillar', existing.strategicPillar, strategicPillar],
+      ['deadline', existing.deadline, deadline],
+      ['pic', existing.pic, pic],
+      ['scope', existing.scope, scope],
+      ['parentId', existing.parentId, parentId !== undefined ? (parentId || null) : undefined],
+    ];
+    await Promise.all(
+      auditFields
+        .filter(([, , nw]) => nw !== undefined)
+        .map(([field, old, nw]) => logFieldChange(itemMeta, field, old, nw))
+    );
+  }
+
   // Inheritance: if chotFlag changed to FALSE, cascade to all descendants
   if (chotFlag !== undefined) {
     await cascadeChotFlag(id, chotFlag);
@@ -235,6 +278,10 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   }
 
   const parentId = item.parentId;
+
+  // Audit log before delete (item won't exist after)
+  await logDeleted({ id: item.id, title: item.title, type: item.type, code: item.code });
+
   await prisma.okrItem.delete({ where: { id } });
 
   if (parentId) await recalcItem(parentId);

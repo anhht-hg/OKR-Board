@@ -7,6 +7,7 @@ import {
   Target,
   LayoutGrid,
   ClipboardList,
+  History,
   LogIn,
   LogOut,
 } from 'lucide-react';
@@ -83,6 +84,26 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {/* Admin-only section */}
+        {isAdmin && (
+          <>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-3 pt-4 pb-2">Admin</p>
+            <Link
+              href="/logs"
+              prefetch={true}
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
+                pathname.startsWith('/logs')
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
+              )}
+            >
+              <History size={16} className={pathname.startsWith('/logs') ? 'text-white' : 'text-gray-400'} />
+              Nhật ký thay đổi
+            </Link>
+          </>
+        )}
       </nav>
 
       {/* Footer */}

@@ -49,6 +49,25 @@ model OkrItem {
   children OkrItem[] @relation("ItemTree")
 }
 
+// ─── Audit Log ───────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+
+  // What item was affected
+  itemId     String
+  itemTitle  String
+  itemType   String
+  itemCode   String?
+
+  // What happened
+  action     String   // 'CREATED' | 'UPDATED' | 'DELETED'
+  field      String?  // null for CREATED/DELETED; field name for UPDATED
+  oldValue   String?
+  newValue   String?
+}
+
 // ─── Kế hoạch hành động (Monthly Action Plan) ────────────────────────────────
 
 model ActionPlan {

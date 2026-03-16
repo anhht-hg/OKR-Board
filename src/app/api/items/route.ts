@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
 import { recalcAncestors } from '@/lib/progress';
 import { STATUS_WEIGHT } from '@/lib/constants';
+import { logCreated } from '@/lib/audit';
 
 async function requireAdmin() {
   const jar = await cookies();
@@ -117,6 +118,9 @@ export async function POST(req: NextRequest) {
 
   // Cascade progress up
   if (parentId) await recalcAncestors(item.id);
+
+  // Audit log
+  await logCreated({ id: item.id, title: item.title, type: item.type, code: item.code });
 
   return NextResponse.json(item, { status: 201 });
 }
